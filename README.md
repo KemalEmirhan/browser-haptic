@@ -1,11 +1,11 @@
-# haptic-js
+# browser-haptic
 
 Lightweight haptic feedback for JavaScript. This repo uses **Bun**. Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API) where available (e.g. Android). On **iOS Safari 17.4+** it uses a hidden `input[switch]` toggle so the native switch haptic fires. No runtime dependencies.
 
 ## Install
 
 ```bash
-bun add haptic-js
+bun add browser-haptic
 ```
 
 ## Usage
@@ -13,7 +13,7 @@ bun add haptic-js
 Import the default export as **`Haptic`** and call its methods:
 
 ```ts
-import Haptic from "haptic-js";
+import Haptic from "browser-haptic";
 
 if (Haptic.isSupported()) {
   Haptic.light();
@@ -25,7 +25,7 @@ if (Haptic.isSupported()) {
 **React example:**
 
 ```tsx
-import Haptic from "haptic-js";
+import Haptic from "browser-haptic";
 
 const App = () => {
   const supported = Haptic.isSupported();
@@ -38,7 +38,7 @@ const App = () => {
 };
 ```
 
-You can also use named imports if you prefer: `import { light, success, isSupported } from "haptic-js"`.
+You can also use named imports if you prefer: `import { light, success, isSupported } from "browser-haptic"`.
 
 ## API
 
@@ -57,18 +57,6 @@ You can also use named imports if you prefer: `import { light, success, isSuppor
 **Type:** `VibrationPattern` = `number | number[]` (for `vibrate()`).
 
 On iOS Safari 17.4+, `isSupported()` is `true` but `hasVibration()` is `false`; the library uses a hidden native switch toggle.
-
-## Test
-
-```bash
-bun test
-```
-
-Coverage (enforces 80% lines and functions):
-
-```bash
-bun run coverage
-```
 
 ## Contributing
 

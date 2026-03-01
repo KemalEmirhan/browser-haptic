@@ -1,5 +1,5 @@
 /**
- * # haptic-js
+ * # browser-haptic
  *
  * Lightweight haptic feedback for web apps. Triggers tactile feedback on supported devices
  * so users get a physical response when they tap buttons, confirm actions, or hit errors.
@@ -33,7 +33,7 @@ export type VibrationPattern = number | number[];
  * Use this when you need to type a variable that holds the default import.
  *
  * @example
- * import Haptic, { type Haptic } from "haptic-js";
+ * import Haptic, { type Haptic } from "browser-haptic";
  * const feedback: Haptic = Haptic;
  */
 export interface Haptic {
@@ -232,7 +232,7 @@ const Haptic: Haptic = {
  * Default export: use as `Haptic` for a clear, namespace-style API.
  *
  * @example
- * import Haptic from "haptic-js";
+ * import Haptic from "browser-haptic";
  *
  * const App = () => {
  *   const supported = Haptic.isSupported();
