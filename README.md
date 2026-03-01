@@ -58,6 +58,12 @@ You can also use named imports if you prefer: `import { light, success, isSuppor
 
 On iOS Safari 17.4+, `isSupported()` is `true` but `hasVibration()` is `false`; the library uses a hidden native switch toggle.
 
+## Test
+
+```bash
+bun test
+```
+
 ## Publishing
 
 From the repo root: `bun run build` then `bun publish`. The package has no runtime dependencies and ships only the `dist/` output (~2.5 KB JS + types).
