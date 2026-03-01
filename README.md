@@ -64,9 +64,16 @@ On iOS Safari 17.4+, `isSupported()` is `true` but `hasVibration()` is `false`; 
 bun test
 ```
 
-## Publishing
+## Contributing
 
-From the repo root: `bun run build` then `bun publish`. The package has no runtime dependencies and ships only the `dist/` output (~2.5 KB JS + types).
+Contributions are welcome. To get started:
+
+1. Fork the repo and clone it locally.
+2. Install dependencies: `bun install`
+3. Make your changes and run tests: `bun test`
+4. Open a pull request with a short description of the change.
+
+For bugs or feature ideas, please open an issue first so we can discuss.
 
 ## License
 
