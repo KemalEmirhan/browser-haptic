@@ -1,7 +1,7 @@
 {
   "name": "browser-haptic",
-  "version": "1.0.3",
-  "description": "Lightweight haptic feedback for JS (Vibration API + iOS Safari switch fallback). No deps.",
+  "version": "1.0.4",
+  "description": "Lightweight haptic feedback for web apps. Vibration API (Android) + iOS Safari 17.4+ switch fallback. Zero dependencies.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,13 +31,20 @@
   "keywords": [
     "browser-haptic",
     "haptic",
+    "haptic-feedback",
     "vibration",
     "vibrate",
+    "vibration-api",
     "ios",
     "safari",
-    "feedback",
+    "android",
     "mobile",
-    "vibration-api"
+    "mobile-web",
+    "pwa",
+    "tactile",
+    "touch-feedback",
+    "ux",
+    "zero-dependencies"
   ],
   "license": "MIT",
   "author": {

@@ -1,18 +1,37 @@
 # browser-haptic
 
-Lightweight haptic feedback for JavaScript. This repo uses **Bun**. Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API) where available (e.g. Android). On **iOS Safari 17.4+** it uses a hidden `input[switch]` toggle so the native switch haptic fires. No runtime dependencies.
+[![npm version](https://img.shields.io/npm/v/browser-haptic.svg)](https://www.npmjs.com/package/browser-haptic)
+[![npm downloads](https://img.shields.io/npm/dm/browser-haptic.svg)](https://www.npmjs.com/package/browser-haptic)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+Lightweight haptic feedback for JavaScript. Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API) where available (e.g. Android). On **iOS Safari 17.4+** it uses a hidden `input[switch]` toggle so the native switch haptic fires. No runtime dependencies.
+
+- [Install](#install)
+- [Usage](#usage)
+- [API](#api)
+- [Contributing](#contributing)
 
 ## Install
 
-From npm (use your package manager):
+**npm**
 
 ```bash
 npm install browser-haptic
 ```
 
+**bun**
+
+```bash
+bun add browser-haptic
+```
+
+**pnpm**
+
 ```bash
 pnpm add browser-haptic
 ```
+
+**yarn**
 
 ```bash
 yarn add browser-haptic
