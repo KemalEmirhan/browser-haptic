@@ -1,6 +1,6 @@
 {
   "name": "browser-haptic",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Lightweight haptic feedback for JS (Vibration API + iOS Safari switch fallback). No deps.",
   "type": "module",
   "main": "dist/index.js",
@@ -40,6 +40,19 @@
     "vibration-api"
   ],
   "license": "MIT",
+  "author": {
+    "name": "Emirhan Kemal Kosem",
+    "email": "emirhankemalkosem@gmail.com",
+    "url": "https://github.com/KemalEmirhan"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KemalEmirhan/browser-haptic.git"
+  },
+  "homepage": "https://github.com/KemalEmirhan/browser-haptic#readme",
+  "bugs": {
+    "url": "https://github.com/KemalEmirhan/browser-haptic/issues"
+  },
   "engines": {
     "node": ">=18"
   },
