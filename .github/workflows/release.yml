@@ -1,11 +1,13 @@
-# On push to main: bump patch version, commit, tag, push, and publish to npm.
-# Manual run: choose patch | minor | major.
+# On push to main: bump patch, tag, and publish to npm only when the PACKAGE changed
+# (not when only playground/ changed). Manual run: always available.
 
 name: Release
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'playground/**'
   workflow_dispatch:
     inputs:
       version:
