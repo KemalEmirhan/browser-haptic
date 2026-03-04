@@ -6,9 +6,12 @@
 
 Lightweight haptic feedback for JavaScript. Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API) where available (e.g. Android). On **iOS Safari 17.4+** it uses a hidden `input[switch]` toggle so the native switch haptic fires. No runtime dependencies.
 
+**[Try the playground →](https://playground-neon-gamma.vercel.app)** — live demo, install commands, and code samples for React, Vue, Svelte, Angular, and TypeScript.
+
 - [Install](#install)
 - [Usage](#usage)
 - [API](#api)
+- [Playground](#playground)
 - [Contributing](#contributing)
 
 ## Install
@@ -86,6 +89,10 @@ You can also use named imports if you prefer: `import { light, success, isSuppor
 **Type:** `VibrationPattern` = `number | number[]` (for `vibrate()`).
 
 On iOS Safari 17.4+, `isSupported()` is `true` but `hasVibration()` is `false`; the library uses a hidden native switch toggle.
+
+## Playground
+
+A live demo and docs site is available at **[playground-neon-gamma.vercel.app](https://playground-neon-gamma.vercel.app)**. You can try haptic feedback in the browser, copy install commands, and see framework-specific examples (React, Vue, Svelte, Angular, TypeScript). The playground source lives in the `playground/` directory of this repo.
 
 ## Contributing
 
