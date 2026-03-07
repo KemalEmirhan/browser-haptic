@@ -13,7 +13,10 @@ import {
   default as Haptic,
 } from "../src/haptic";
 
-type NavigatorLike = { vibrate: ((pattern: number | number[]) => boolean) | null };
+type NavigatorLike = {
+  vibrate: ((pattern: number | number[]) => boolean) | null;
+  userAgent?: string;
+};
 type DocumentLike = { body: unknown } | undefined;
 type VibrateMock = {
   (pattern: number | number[]): boolean;
@@ -114,6 +117,18 @@ describe("haptic", () => {
     test.each(PRESET_CASES)("%s calls vibrate with expected pattern", (_name, trigger, expected) => {
       trigger();
       expect(vibrateMock).toHaveBeenCalledWith(expected);
+    });
+
+    test("on Android, light and success use 1001ms minimum so vibration is not ignored", () => {
+      const vibrateMock = createVibrateMock();
+      setGlobals(
+        { vibrate: vibrateMock, userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 9) ..." },
+        undefined,
+      );
+      light();
+      expect(vibrateMock).toHaveBeenNthCalledWith(1, 1001);
+      success();
+      expect(vibrateMock).toHaveBeenNthCalledWith(2, [1001, 150, 1001]);
     });
   });
 
