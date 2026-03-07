@@ -39,11 +39,11 @@ const withVibrationApi = (): VibrateMock => {
 };
 
 const PRESET_CASES: [string, () => void, number | number[]][] = [
-  ["light", light, 10],
-  ["medium", medium, 20],
-  ["heavy", heavy, 40],
-  ["success", success, [10, 50, 10]],
-  ["warning", warning, [30, 30, 30]],
+  ["light", light, 30],
+  ["medium", medium, 50],
+  ["heavy", heavy, 80],
+  ["success", success, [20, 50, 20]],
+  ["warning", warning, [40, 30, 40]],
   ["error", error, [50, 30, 50, 30, 50]],
 ];
 
@@ -182,7 +182,7 @@ describe("haptic", () => {
     test("delegates to same implementation as named exports", () => {
       const vibrateMock = withVibrationApi();
       Haptic.light();
-      expect(vibrateMock).toHaveBeenCalledWith(10);
+      expect(vibrateMock).toHaveBeenCalledWith(30);
     });
   });
 });
