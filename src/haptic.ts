@@ -26,7 +26,17 @@
  * - **Array:** Alternating [vibrate, pause, vibrate, pause, ...] in milliseconds.
  *   Example: `[10, 50, 10]` = vibrate 10ms, pause 50ms, vibrate 10ms (double tap).
  */
-export type VibrationPattern = number | number[];
+export type VibrationPattern = number | number[] | readonly number[];
+
+/** Haptic preset variant. Use with presets Map for type-safe lookups. */
+export enum HapticPreset {
+  Light = "light",
+  Medium = "medium",
+  Heavy = "heavy",
+  Success = "success",
+  Warning = "warning",
+  Error = "error",
+}
 
 /**
  * Type of the default export: an object with all haptic methods.
@@ -48,14 +58,30 @@ export interface Haptic {
   error(): void;
 }
 
-const PRESETS = {
-  light: 10,
-  medium: 20,
-  heavy: 40,
-  success: [10, 50, 10],
-  warning: [30, 30, 30],
-  error: [50, 30, 50, 30, 50],
-} as const;
+/** Presets for Vibration API (Android, desktop). Longer durations for clearer feedback. */
+const VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
+  [HapticPreset.Light, 30],
+  [HapticPreset.Medium, 50],
+  [HapticPreset.Heavy, 80],
+  [HapticPreset.Success, [20, 50, 20]],
+  [HapticPreset.Warning, [40, 30, 40]],
+  [HapticPreset.Error, [50, 30, 50, 30, 50]],
+]);
+
+/** Presets for iOS switch fallback. Multiple toggles so light/medium/heavy are noticeable. */
+const IOS_PRESETS = new Map<HapticPreset, number | number[]>([
+  [HapticPreset.Light, [15, 40, 15]],
+  [HapticPreset.Medium, [15, 35, 15, 35, 15]],
+  [HapticPreset.Heavy, [15, 30, 15, 30, 15, 30, 15]],
+  [HapticPreset.Success, [20, 50, 20]],
+  [HapticPreset.Warning, [40, 30, 40]],
+  [HapticPreset.Error, [50, 30, 50, 30, 50]],
+]);
+
+const getPreset = (variant: HapticPreset): VibrationPattern => {
+  const presets = hasVibrationAPI() ? VIBRATION_PRESETS : IOS_PRESETS;
+  return presets.get(variant)!;
+};
 
 const hasVibrationAPI = (): boolean =>
   typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
@@ -83,13 +109,13 @@ const fireIOSSwitch = (): void => {
 };
 
 const toPatternArray = (pattern: VibrationPattern): number[] =>
-  Array.isArray(pattern) ? [...pattern] : [pattern];
+  (Array.isArray(pattern) ? [...pattern] : [pattern]) as number[];
 
 const trigger = (pattern: VibrationPattern): void => {
   if (hasVibrationAPI()) {
     try {
       const p = Array.isArray(pattern) ? [...pattern] : pattern;
-      navigator.vibrate(p);
+      navigator.vibrate(p as number | number[]);
     } catch {
       // no-op
     }
@@ -171,50 +197,49 @@ export const vibrate = (pattern: VibrationPattern): void => trigger(pattern);
  * Triggers a short, light tap.
  *
  * Best for subtle feedback: selection changes, toggles, or gentle confirmation.
- * Equivalent to a single 10ms vibration.
+ * On Vibration API: ~30ms. On iOS: double tap for clearer feedback.
  */
-export const light = (): void => trigger(PRESETS.light);
+export const light = (): void => trigger(getPreset(HapticPreset.Light));
 
 /**
  * Triggers a medium-strength tap.
  *
  * Good for standard button presses and list item taps. Equivalent to a single
- * 20ms vibration.
+ * On Vibration API: ~50ms. On iOS: three short pulses for clearer feedback.
  */
-export const medium = (): void => trigger(PRESETS.medium);
+export const medium = (): void => trigger(getPreset(HapticPreset.Medium));
 
 /**
  * Triggers a strong tap.
  *
  * Use for important actions (e.g. submit, delete) where you want a more
- * noticeable response. Equivalent to a single 40ms vibration.
+ * noticeable response. On Vibration API: ~80ms. On iOS: four pulses.
  */
-export const heavy = (): void => trigger(PRESETS.heavy);
+export const heavy = (): void => trigger(getPreset(HapticPreset.Heavy));
 
 /**
  * Triggers a double-tap pattern (short, pause, short).
  *
  * Suggests “success” or “done”—e.g. after saving, completing a step, or
- * confirming a choice. Pattern: 10ms, 50ms pause, 10ms.
+ * confirming a choice.
  */
-export const success = (): void => trigger([...PRESETS.success]);
+export const success = (): void => trigger(getPreset(HapticPreset.Success));
 
 /**
- * Triggers a triple-tap pattern.
+ * Triggers a double-tap pattern with stronger pulses.
  *
  * Suggests “warning” or “attention”—e.g. before a destructive action or when
- * something needs the user’s notice. Pattern: three 30ms pulses with 30ms
- * pauses between them.
+ * something needs the user’s notice.
  */
-export const warning = (): void => trigger([...PRESETS.warning]);
+export const warning = (): void => trigger(getPreset(HapticPreset.Warning));
 
 /**
  * Triggers a longer, more urgent pattern (five pulses).
  *
  * Use for errors, failures, or critical alerts where you want the user to
- * clearly notice the feedback. Pattern: 50ms, 30ms pause, 50ms, 30ms pause, 50ms.
+ * clearly notice the feedback.
  */
-export const error = (): void => trigger([...PRESETS.error]);
+export const error = (): void => trigger(getPreset(HapticPreset.Error));
 
 const Haptic: Haptic = {
   hasVibration,
