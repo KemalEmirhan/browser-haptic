@@ -58,14 +58,7 @@ export interface Haptic {
   error(): void;
 }
 
-/**
- * Minimum vibration duration (ms) that some Android builds honor.
- * On affected devices, values below this are ignored (e.g. Pixel 9 / Android 16).
- * @see https://stackoverflow.com/questions/79077091/navigator-vibrate-on-android-only-works-for-vibrations-longer-than-one-second
- */
-const ANDROID_MIN_VIBRATION_MS = 1001;
-
-/** Presets for Vibration API (non-Android: desktop, etc.). Short durations for crisp feedback. */
+/** Presets for Vibration API (non-Android). Short durations for crisp haptic feedback. */
 const VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
   [HapticPreset.Light, 30],
   [HapticPreset.Medium, 50],
@@ -76,16 +69,17 @@ const VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
 ]);
 
 /**
- * Presets for Android Web Vibration API. Many Android builds ignore vibrations under ~1000ms,
- * so each segment uses ANDROID_MIN_VIBRATION_MS so light/success/etc. actually fire.
+ * Presets for Android. Uses longer pulses (400–500ms) so vibration is not ignored on builds
+ * that drop very short patterns. Kept minimal: single pulse for light/medium/heavy, 2–3
+ * pulses for success/warning/error with short gaps.
  */
 const ANDROID_VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
-  [HapticPreset.Light, ANDROID_MIN_VIBRATION_MS],
-  [HapticPreset.Medium, ANDROID_MIN_VIBRATION_MS],
-  [HapticPreset.Heavy, ANDROID_MIN_VIBRATION_MS],
-  [HapticPreset.Success, [ANDROID_MIN_VIBRATION_MS, 150, ANDROID_MIN_VIBRATION_MS]],
-  [HapticPreset.Warning, [ANDROID_MIN_VIBRATION_MS, 100, ANDROID_MIN_VIBRATION_MS, 100, ANDROID_MIN_VIBRATION_MS]],
-  [HapticPreset.Error, [ANDROID_MIN_VIBRATION_MS, 80, ANDROID_MIN_VIBRATION_MS, 80, ANDROID_MIN_VIBRATION_MS, 80, ANDROID_MIN_VIBRATION_MS]],
+  [HapticPreset.Light, 400],
+  [HapticPreset.Medium, 400],
+  [HapticPreset.Heavy, 500],
+  [HapticPreset.Success, [400, 80, 400]],
+  [HapticPreset.Warning, [400, 60, 400]],
+  [HapticPreset.Error, [400, 50, 400, 50, 400]],
 ]);
 
 /** Presets for iOS switch fallback. Multiple toggles so light/medium/heavy are noticeable. */
@@ -99,8 +93,7 @@ const IOS_PRESETS = new Map<HapticPreset, number | number[]>([
 ]);
 
 const isAndroid = (): boolean =>
-  typeof navigator !== "undefined" &&
-  /Android/i.test(navigator.userAgent ?? "");
+  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent ?? "");
 
 const getPreset = (variant: HapticPreset): VibrationPattern => {
   if (!hasVibrationAPI()) return IOS_PRESETS.get(variant)!;

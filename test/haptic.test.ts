@@ -119,16 +119,18 @@ describe("haptic", () => {
       expect(vibrateMock).toHaveBeenCalledWith(expected);
     });
 
-    test("on Android, light and success use 1001ms minimum so vibration is not ignored", () => {
+    test("on Android uses longer minimal presets (400–500ms) so vibration is noticeable", () => {
       const vibrateMock = createVibrateMock();
       setGlobals(
-        { vibrate: vibrateMock, userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 9) ..." },
+        { vibrate: vibrateMock, userAgent: "Mozilla/5.0 (Linux; Android 14) ..." },
         undefined,
       );
       light();
-      expect(vibrateMock).toHaveBeenNthCalledWith(1, 1001);
+      expect(vibrateMock).toHaveBeenNthCalledWith(1, 400);
       success();
-      expect(vibrateMock).toHaveBeenNthCalledWith(2, [1001, 150, 1001]);
+      expect(vibrateMock).toHaveBeenNthCalledWith(2, [400, 80, 400]);
+      heavy();
+      expect(vibrateMock).toHaveBeenNthCalledWith(3, 500);
     });
   });
 
