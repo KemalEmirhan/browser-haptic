@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useLayoutEffect, useRef } from "react";
+import Haptic from "browser-haptic";
 import { SiReact, SiTypescript, SiVuedotjs, SiSvelte, SiAngular } from "react-icons/si";
 import { CodeBlockWithCopy } from "./CodeBlockWithCopy";
 
@@ -105,10 +106,14 @@ export const UsageSection = () => {
               key={fw.id}
               type="button"
               data-tab={fw.id}
-              onClick={() => setActive(fw.id)}
+              onClick={() => {
+                Haptic.light();
+                setActive(fw.id);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
+                  Haptic.light();
                   setActive(fw.id);
                 }
               }}

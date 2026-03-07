@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useLayoutEffect, useRef } from "react";
+import Haptic from "browser-haptic";
 import { CodeBlockWithCopy } from "./CodeBlockWithCopy";
 
 const PACKAGE_MANAGERS = [
@@ -48,10 +49,14 @@ export const InstallSection = () => {
             key={pm.id}
             type="button"
             data-tab={pm.id}
-            onClick={() => setActive(pm.id)}
+            onClick={() => {
+              Haptic.light();
+              setActive(pm.id);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
+                Haptic.light();
                 setActive(pm.id);
               }
             }}

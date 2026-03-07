@@ -43,7 +43,11 @@ export const HapticDemo = () => {
 
   const handleCustomVibrate = () => {
     const pattern = parsePattern(customPattern);
-    if (pattern.length > 0) Haptic.vibrate(pattern);
+    if (pattern.length > 0) {
+      Haptic.vibrate(pattern);
+    } else {
+      Haptic.light();
+    }
   };
 
   return (

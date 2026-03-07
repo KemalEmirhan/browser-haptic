@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import Haptic from "browser-haptic";
 
 type CodeBlockWithCopyProps = {
   code: string;
@@ -82,11 +83,13 @@ export const CodeBlockWithCopy = ({ code, className = "" }: CodeBlockWithCopyPro
   const handleCopy = useCallback(() => {
     const text = code.trim();
     if (!text) return;
+    Haptic.light();
     // Use sync fallback first so it runs in the same user-gesture tick (fixes iOS/mobile)
-    let success = copyToClipboard(text);
-    if (!success && navigator.clipboard?.writeText) {
+    const copyOk = copyToClipboard(text);
+    if (!copyOk && navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(text).then(
         () => {
+          Haptic.success();
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         },
@@ -94,8 +97,9 @@ export const CodeBlockWithCopy = ({ code, className = "" }: CodeBlockWithCopyPro
       );
       return;
     }
-    setCopied(success);
-    if (success) setTimeout(() => setCopied(false), 2000);
+    if (copyOk) Haptic.success();
+    setCopied(copyOk);
+    if (copyOk) setTimeout(() => setCopied(false), 2000);
   }, [code, copyToClipboard]);
 
   useEffect(() => {

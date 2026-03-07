@@ -1,3 +1,6 @@
+"use client";
+
+import Haptic from "browser-haptic";
 import { SiGithub, SiNpm } from "react-icons/si";
 import { HapticDemo } from "@/components/HapticDemo";
 import { InstallSection } from "@/components/InstallSection";
@@ -31,6 +34,7 @@ export default function PlaygroundPage() {
             href={NPM_URL}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => Haptic.light()}
             className="inline-flex items-center justify-center rounded p-2 text-[var(--text)] transition hover:bg-[var(--border)] hover:text-[var(--accent)]"
             aria-label="npm package"
           >
@@ -40,6 +44,7 @@ export default function PlaygroundPage() {
             href={REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => Haptic.light()}
             className="inline-flex items-center justify-center rounded p-2 text-[var(--text)] transition hover:bg-[var(--border)] hover:text-[var(--accent)]"
             aria-label="GitHub repository"
           >
