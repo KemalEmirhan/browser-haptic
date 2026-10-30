@@ -4,61 +4,30 @@
 [![npm downloads](https://img.shields.io/npm/dm/browser-haptic.svg)](https://www.npmjs.com/package/browser-haptic)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Lightweight haptic feedback for JavaScript. Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API) where available (e.g. Android). On **iPhone with Safari 17.4+**, `attach()` covers your button with an invisible label tied to a native switch, so the user's tap plays the iOS switch tick (see [iOS](#ios)). No runtime dependencies.
+Haptic feedback for the web: vibration on Android, native ticks on iPhone. No dependencies.
 
-**[Try the playground →](https://playground-neon-gamma.vercel.app)**: live demo, install commands, and code samples for React, Vue, Svelte, Angular, and TypeScript.
-
-- [Install](#install)
-- [Usage](#usage)
-- [API](#api)
-- [iOS](#ios)
-- [Playground](#playground)
-- [Contributing](#contributing)
+**[Try it on your phone →](https://playground-neon-gamma.vercel.app)**
 
 ## Install
 
-**npm**
-
 ```bash
-npm install browser-haptic
-```
-
-**bun**
-
-```bash
-bun add browser-haptic
-```
-
-**pnpm**
-
-```bash
-pnpm add browser-haptic
-```
-
-**yarn**
-
-```bash
-yarn add browser-haptic
+npm install browser-haptic   # or: bun add / pnpm add / yarn add
 ```
 
 ## Usage
 
-**Recommended: `attach()` an element.** This is the only approach that buzzes on current iPhones (iOS 26.5 and later), and it works on Android too:
+Attach feedback to an element once. Every tap on it then buzzes.
 
 ```ts
 import Haptic from "browser-haptic";
 
 const detach = Haptic.attach(document.querySelector("#save")!, "success");
-// later, e.g. on unmount
-detach();
+detach(); // remove it later, e.g. on unmount
 ```
 
 **React:**
 
 ```tsx
-import { useEffect, useRef } from "react";
-import Haptic from "browser-haptic";
-
 const SaveButton = () => {
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => Haptic.attach(ref.current!, "success"), []);
@@ -66,70 +35,57 @@ const SaveButton = () => {
 };
 ```
 
-**Calling presets directly** works on Android. On iPhone it is best effort and silent on iOS 26.5+:
+The playground has the same example for Vue, Svelte and Angular.
 
-```ts
-import Haptic from "browser-haptic";
+## Platform support
 
-if (Haptic.isSupported()) {
-  Haptic.light();
-  Haptic.success();
-  Haptic.vibrate([10, 50, 10, 50, 10]);
-}
-```
+| Platform | `attach(el)` | `light()`, `success()`, … |
+|---|---|---|
+| Android | Vibrates with the preset | Vibrates with the preset |
+| iPhone, iOS 26.5+ | One tick per tap | Silent |
+| iPhone, iOS 17.4 to 26.4 | One tick per tap | One tick, only inside a tap handler |
+| iPad | Nothing (no Taptic Engine) | Nothing |
+| Desktop | Nothing (Chrome accepts the call, but there is no motor) | Nothing |
+| Server (SSR) | Safe no-op | Safe no-op |
 
-You can also use named imports if you prefer: `import { light, success, isSupported } from "browser-haptic"`.
+**Use `attach()`.** It is the only way to get haptics on current iPhones.
 
 ## API
 
-| Method | Description |
-|--------|-------------|
-| `Haptic.attach(el, preset?)` | Haptic feedback on every tap of `el`. Returns a cleanup function. Recommended for iPhone. `preset` defaults to `"light"` and is ignored on iPhone |
-| `Haptic.isSupported()` | `true` if feedback can run: Vibration API, or an iPhone with Safari 17.4+. `false` on desktop Safari, desktop Firefox and iPads |
-| `Haptic.isReliable()` | `true` only when the Vibration API exists. On iPhone only `attach()` is reliable |
-| `Haptic.hasVibration()` | `true` only when the Vibration API is available (e.g. Android) |
-| `Haptic.vibrate(pattern)` | Trigger feedback: `number` (ms) or `number[]` (vibrate/pause sequence) |
-| `Haptic.light()` | Short tap |
-| `Haptic.medium()` | Medium tap |
-| `Haptic.heavy()` | Strong tap |
-| `Haptic.success()` | Double tap |
-| `Haptic.warning()` | Triple tap |
-| `Haptic.error()` | Longer alert pattern |
+| Method | What it does |
+|---|---|
+| `attach(el, preset?)` | Feedback on every tap of `el`. Returns a cleanup function. `preset` defaults to `"light"` |
+| `light()`, `medium()`, `heavy()` | Single tap: 15, 25, 40 ms |
+| `success()`, `warning()`, `error()` | Two, two longer, three pulses |
+| `vibrate(pattern)` | Custom pattern in ms: `50` or `[vibrate, pause, vibrate, …]` |
+| `isSupported()` | `true` when the Vibration API exists, or on iPhone with Safari 17.4+ |
+| `isReliable()` | `true` only with the Vibration API (Android). iPhone ticks are best effort |
+| `hasVibration()` | `true` when `navigator.vibrate` exists |
 
-**Types:** `VibrationPattern` = `number | number[]` (for `vibrate()`). `HapticPresetName` = `HapticPreset` or its string name, e.g. `"success"` (for `attach()`).
+Presets are `"light" | "medium" | "heavy" | "success" | "warning" | "error"` (type `HapticPresetName`). Everything is available as a named import too: `import { attach } from "browser-haptic"`.
 
-On an iPhone with Safari 17.4+, `isSupported()` is `true` but `isReliable()` and `hasVibration()` are `false`.
+## How it works on iPhone
 
-## iOS
+iOS has no Vibration API. The only haptic a web page can reach is the tick a native switch (`<input type="checkbox" switch>`) plays when the user toggles it.
 
-iOS has no Vibration API. The only web haptic on iPhone is the tick a native switch (`<input type="checkbox" switch>`, Safari 17.4+) plays when it is toggled.
+`attach()` covers your element with an invisible `<label>` tied to a hidden switch. Your user's tap toggles the switch for real, so iOS plays the tick, and the tap is forwarded to your element as a normal click. `onClick`, form submits and links keep working, and swipes that start on the element still scroll.
 
-**Use `attach()`.** It covers your element with an invisible `<label>` tied to a hidden native switch, so the user's finger toggles the switch for real and iOS plays the tick. Because the cover is a label and not the switch itself, swipes that start on the element still scroll, including inside scrolling rows and lists. The tap is then forwarded to your element as a click, so `onClick` handlers, form submits and links keep working. Since iOS 26.5, this is the only approach that still buzzes.
+Limits:
 
-- One tick per tap. Presets, patterns and intensity have no effect on iPhone.
-- iPads are not supported. They have no Taptic Engine.
-- The forwarded click is a synthetic event (`isTrusted` is `false`).
-- Keyboard users activate the element normally (no haptic); screen readers ignore the overlay.
+- **One tick per tap.** iOS has no strength control, so every preset feels the same.
+- **Ticks triggered from code are ignored** on iOS 26.5+, so `light()` and friends are silent there.
+- The forwarded click has `isTrusted: false`. Keyboard users activate the element normally, without a tick.
 
-**`light()`, `success()` and the other functions** toggle a hidden switch from code. iOS 26.5+ ignores script-triggered toggles even inside a tap, so they are silent there (confirmed on iOS 27). On older iOS they must be called synchronously inside a tap handler, never after `await` or a timer. Their hidden switch's `click` and `change` events stop at the switch, so normal `document` listeners do not see them; capture-phase listeners on `document` or `window` still do.
-
-The overlay technique is adapted from [`attachIOSOverlay`](https://github.com/howdoiusekeyboard/haptics/blob/main/packages/core/src/engine.ts) from [howdoiusekeyboard/haptics](https://github.com/howdoiusekeyboard/haptics) (MIT).
-
-## Playground
-
-A live demo and docs site is available at **[playground-neon-gamma.vercel.app](https://playground-neon-gamma.vercel.app)**. You can try haptic feedback in the browser, copy install commands, and see framework-specific examples (React, Vue, Svelte, Angular, TypeScript). The playground source lives in the `playground/` directory of this repo.
+The overlay technique is adapted from [`attachIOSOverlay`](https://github.com/howdoiusekeyboard/haptics/blob/main/packages/core/src/engine.ts) in [howdoiusekeyboard/haptics](https://github.com/howdoiusekeyboard/haptics) (MIT).
 
 ## Contributing
 
-Contributions are welcome. To get started:
+1. `bun install`
+2. `bun test`
+3. Open a pull request. For larger changes, open an issue first.
 
-1. Fork the repo and clone it locally.
-2. Install dependencies: `bun install`
-3. Make your changes and run tests: `bun test`
-4. Open a pull request with a short description of the change.
-
-For bugs or feature ideas, please open an issue first so we can discuss.
+The playground lives in `playground/`.
 
 ## License
 
-MIT Copyright (c) 2026 Emirhan Kemal Kosem
+MIT © 2026 Emirhan Kemal Kosem
