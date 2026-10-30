@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import Haptic from "browser-haptic";
+import { useHaptic } from "./useHaptic";
 
 type CodeBlockWithCopyProps = {
   code: string;
@@ -48,6 +48,7 @@ const CopiedIconSvg = ({ className = "" }: { className?: string }) => (
 export const CodeBlockWithCopy = ({ code, className = "" }: CodeBlockWithCopyProps) => {
   const [copied, setCopied] = useState(false);
   const [isBlurring, setIsBlurring] = useState(false);
+  const copyRef = useHaptic<HTMLButtonElement>("success");
 
   const copyToClipboard = useCallback((text: string): boolean => {
     const trimmed = text.trim();
@@ -83,13 +84,11 @@ export const CodeBlockWithCopy = ({ code, className = "" }: CodeBlockWithCopyPro
   const handleCopy = useCallback(() => {
     const text = code.trim();
     if (!text) return;
-    Haptic.light();
     // Use sync fallback first so it runs in the same user-gesture tick (fixes iOS/mobile)
     const copyOk = copyToClipboard(text);
     if (!copyOk && navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(text).then(
         () => {
-          Haptic.success();
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         },
@@ -97,7 +96,6 @@ export const CodeBlockWithCopy = ({ code, className = "" }: CodeBlockWithCopyPro
       );
       return;
     }
-    if (copyOk) Haptic.success();
     setCopied(copyOk);
     if (copyOk) setTimeout(() => setCopied(false), 2000);
   }, [code, copyToClipboard]);
@@ -116,15 +114,10 @@ export const CodeBlockWithCopy = ({ code, className = "" }: CodeBlockWithCopyPro
         <code>{code.trim()}</code>
       </pre>
       <button
+        ref={copyRef}
         type="button"
         onClick={handleCopy}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleCopy();
-          }
-        }}
-        className="absolute right-2 top-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md text-slate-500 transition-transform duration-150 ease-out hover:bg-[var(--border)]/50 hover:text-slate-700 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--code-bg)]"
+        className="absolute right-2 top-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md bg-[var(--code-bg)] text-slate-500 shadow-[-12px_0_12px_var(--code-bg)] transition-transform duration-150 ease-out hover:bg-[var(--border)] hover:text-slate-700 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--code-bg)]"
         aria-label={copied ? "Copied" : "Copy code"}
       >
         <span

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useLayoutEffect, useRef } from "react";
-import Haptic from "browser-haptic";
+import { HapticButton } from "./HapticButton";
 import { CodeBlockWithCopy } from "./CodeBlockWithCopy";
 
 const PACKAGE_MANAGERS = [
@@ -45,20 +45,11 @@ export const InstallSection = () => {
       >
         <div className="tab-slider" aria-hidden />
         {PACKAGE_MANAGERS.map((pm) => (
-          <button
+          <HapticButton
             key={pm.id}
-            type="button"
             data-tab={pm.id}
             onClick={() => {
-              Haptic.light();
               setActive(pm.id);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                Haptic.light();
-                setActive(pm.id);
-              }
             }}
             style={{ anchorName: `--tab-${pm.id}` } as React.CSSProperties}
             className="rounded-md px-4 py-2 text-sm font-medium text-[var(--muted)] transition hover:text-[var(--text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)]"
@@ -66,7 +57,7 @@ export const InstallSection = () => {
             aria-pressed={active === pm.id}
           >
             {pm.label}
-          </button>
+          </HapticButton>
         ))}
       </div>
       <div className="mt-4">
