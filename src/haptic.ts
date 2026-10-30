@@ -92,6 +92,19 @@ const hasVibrationAPI = (): boolean =>
 const hasDOM = (): boolean =>
   typeof document !== "undefined" && !!document.body;
 
+/** iPhone or iPod. iPads are left out on purpose: they have no Taptic Engine. */
+const isIPhone = (): boolean =>
+  typeof navigator !== "undefined" && /iPhone|iPod/.test(navigator.userAgent ?? "");
+
+/** True when `<input type="checkbox" switch>` is supported (Safari 17.4+). */
+const hasSwitchControl = (): boolean =>
+  typeof HTMLInputElement !== "undefined" && "switch" in HTMLInputElement.prototype;
+
+/** The hidden-switch path only runs where it can buzz: an iPhone with switch support. */
+const canUseIOSSwitch = (): boolean => isIPhone() && hasSwitchControl() && hasDOM();
+
+const stopEvent = (event: Event): void => event.stopPropagation();
+
 const fireIOSSwitch = (): void => {
   if (!hasDOM()) return;
   try {
@@ -102,6 +115,8 @@ const fireIOSSwitch = (): void => {
     const input = document.createElement("input");
     input.type = "checkbox";
     input.setAttribute("switch", "");
+    label.addEventListener("click", stopEvent);
+    input.addEventListener("change", stopEvent);
     label.appendChild(input);
     document.body.appendChild(label);
     label.click();
@@ -126,6 +141,8 @@ const trigger = (pattern: VibrationPattern): void => {
     }
     return;
   }
+
+  if (!canUseIOSSwitch()) return;
 
   const arr = toPatternArray(pattern);
   const pairs = Array.from(
@@ -161,8 +178,9 @@ export const hasVibration = (): boolean => hasVibrationAPI();
 /**
  * Checks whether **any** haptic feedback can be triggered in this environment.
  *
- * Returns `true` if either the Vibration API is available or we’re in a browser
- * with a DOM (so the iOS switch fallback can run). Use this to decide whether
+ * Returns `true` if the Vibration API is available, or on an iPhone with
+ * Safari 17.4+ (where the hidden switch fallback runs). Returns `false` on
+ * desktop Safari, desktop Firefox and iPads, where nothing would happen. Use this to decide whether
  * to show “haptic” UI or to call the feedback functions at all. In SSR or
  * unsupported environments this returns `false` and all feedback calls no-op.
  *
@@ -177,7 +195,7 @@ export const hasVibration = (): boolean => hasVibrationAPI();
  */
 export const isSupported = (): boolean => {
   if (typeof navigator === "undefined" || typeof document === "undefined") return false;
-  return hasVibrationAPI() || hasDOM();
+  return hasVibrationAPI() || canUseIOSSwitch();
 };
 
 /**
