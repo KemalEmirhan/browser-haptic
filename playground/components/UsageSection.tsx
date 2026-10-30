@@ -39,23 +39,32 @@ onUnmounted(() => detach?.());
 const SVELTE_CODE = `<script>
   import Haptic from "browser-haptic";
 
-  const haptic = (node, preset) => ({ destroy: Haptic.attach(node, preset) });
+  const haptic = (node, preset) => ({
+    destroy: Haptic.attach(node, preset),
+  });
 </script>
 
 <button use:haptic={"success"} on:click={save}>
   Save
 </button>`;
 
-const ANGULAR_CODE = `import { Directive, ElementRef, Input, OnDestroy, OnInit } from "@angular/core";
+const ANGULAR_CODE = `import { Directive, ElementRef, Input } from "@angular/core";
 import Haptic, { type HapticPresetName } from "browser-haptic";
 
 @Directive({ selector: "[haptic]", standalone: true })
-export class HapticDirective implements OnInit, OnDestroy {
+export class HapticDirective {
   @Input() haptic: HapticPresetName = "light";
   private detach = () => {};
+
   constructor(private el: ElementRef<HTMLElement>) {}
-  ngOnInit() { this.detach = Haptic.attach(this.el.nativeElement, this.haptic); }
-  ngOnDestroy() { this.detach(); }
+
+  ngOnInit() {
+    this.detach = Haptic.attach(this.el.nativeElement, this.haptic);
+  }
+
+  ngOnDestroy() {
+    this.detach();
+  }
 }
 
 // <button haptic="success" (click)="save()">Save</button>`;

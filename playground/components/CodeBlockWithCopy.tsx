@@ -117,7 +117,7 @@ export const CodeBlockWithCopy = ({ code, className = "" }: CodeBlockWithCopyPro
         ref={copyRef}
         type="button"
         onClick={handleCopy}
-        className="absolute right-2 top-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md text-slate-500 transition-transform duration-150 ease-out hover:bg-[var(--border)]/50 hover:text-slate-700 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--code-bg)]"
+        className="absolute right-2 top-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md bg-[var(--code-bg)] text-slate-500 shadow-[-12px_0_12px_var(--code-bg)] transition-transform duration-150 ease-out hover:bg-[var(--border)] hover:text-slate-700 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--code-bg)]"
         aria-label={copied ? "Copied" : "Copy code"}
       >
         <span
