@@ -8,9 +8,9 @@
  *
  * - **Android & supported desktop:** Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API)
  *   (`navigator.vibrate`) to run vibration patterns you define.
- * - **iOS Safari 17.4+:** The Vibration API is not available. This module uses a hidden
- *   `input[switch]` element and programmatically toggles it; iOS plays its native switch haptic
- *   when that happens. No audio, no extra permissions.
+ * - **iPhone, Safari 17.4+:** The Vibration API is not available. This module toggles a hidden
+ *   `input[switch]` element once; iOS plays its native switch tick. Best effort only: it must run
+ *   synchronously inside a tap handler, it is always a single tick, and iOS 26.5+ may ignore it.
  *
  * If the environment doesn’t support either (e.g. old browsers or SSR), all functions no-op
  * and never throw.
@@ -48,6 +48,7 @@ export enum HapticPreset {
  */
 export interface Haptic {
   hasVibration(): boolean;
+  isReliable(): boolean;
   isSupported(): boolean;
   vibrate(pattern: VibrationPattern): void;
   light(): void;
@@ -71,20 +72,7 @@ const VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
   [HapticPreset.Error, [40, 60, 40, 60, 40]],
 ]);
 
-/** Presets for iOS switch fallback. Multiple toggles so light/medium/heavy are noticeable. */
-const IOS_PRESETS = new Map<HapticPreset, number | number[]>([
-  [HapticPreset.Light, [15, 40, 15]],
-  [HapticPreset.Medium, [15, 35, 15, 35, 15]],
-  [HapticPreset.Heavy, [15, 30, 15, 30, 15, 30, 15]],
-  [HapticPreset.Success, [20, 50, 20]],
-  [HapticPreset.Warning, [40, 30, 40]],
-  [HapticPreset.Error, [50, 30, 50, 30, 50]],
-]);
-
-const getPreset = (variant: HapticPreset): VibrationPattern => {
-  if (!hasVibrationAPI()) return IOS_PRESETS.get(variant)!;
-  return VIBRATION_PRESETS.get(variant)!;
-};
+const getPreset = (variant: HapticPreset): VibrationPattern => VIBRATION_PRESETS.get(variant)!;
 
 const hasVibrationAPI = (): boolean =>
   typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
@@ -142,18 +130,8 @@ const trigger = (pattern: VibrationPattern): void => {
     return;
   }
 
-  if (!canUseIOSSwitch()) return;
-
-  const arr = toPatternArray(pattern);
-  const pairs = Array.from(
-    { length: Math.ceil(arr.length / 2) },
-    (_, i) => [arr[i * 2] ?? 0, arr[i * 2 + 1] ?? 0] as const,
-  );
-  let delay = 0;
-  for (const [vibrateMs, pauseMs] of pairs) {
-    if (vibrateMs > 0) setTimeout(fireIOSSwitch, delay);
-    delay += vibrateMs + pauseMs;
-  }
+  // iOS: one tick, right now. A timer would leave the user gesture, and iOS drops the haptic.
+  if (canUseIOSSwitch()) fireIOSSwitch();
 };
 
 /**
@@ -161,7 +139,7 @@ const trigger = (pattern: VibrationPattern): void => {
  *
  * Returns `true` on Android and some desktop browsers that support
  * `navigator.vibrate`. Returns `false` on iOS Safari (which doesn’t implement
- * the Vibration API); on iOS you can still use the other functions—they will
+ * the Vibration API); on iOS you can still use the other functions: they will
  * use the switch-based fallback when this returns `false`.
  *
  * @returns `true` if `navigator.vibrate` is a function, otherwise `false`
@@ -174,6 +152,17 @@ const trigger = (pattern: VibrationPattern): void => {
  * }
  */
 export const hasVibration = (): boolean => hasVibrationAPI();
+
+/**
+ * Checks whether feedback is **guaranteed** to run when called.
+ *
+ * Returns `true` only when the Vibration API exists. On iPhone the switch tick
+ * is best effort: iOS may ignore it (for example on iOS 26.5+, or when called
+ * outside a tap handler) and there is no way to detect that.
+ *
+ * @returns `true` if `navigator.vibrate` is a function, otherwise `false`
+ */
+export const isReliable = (): boolean => hasVibrationAPI();
 
 /**
  * Checks whether **any** haptic feedback can be triggered in this environment.
@@ -203,12 +192,10 @@ export const isSupported = (): boolean => {
  *
  * Use this when the preset patterns (light, success, error, etc.) aren’t enough.
  * On Vibration API devices the pattern is passed through to `navigator.vibrate`.
- * On iOS the pattern is interpreted as a sequence of pulses: each “vibrate”
- * segment triggers one switch toggle, with pauses between them.
+ * On iPhone any pattern becomes a single switch tick.
  *
  * @param pattern - Either a single duration in ms, or an array of
- *   [vibrate, pause, vibrate, pause, ...] in ms. Pause values are used as delays
- *   between pulses; they don’t trigger vibration themselves.
+ *   [vibrate, pause, vibrate, pause, ...] in ms.
  * @returns Nothing. Never throws; unsupported environments no-op.
  *
  * @example
@@ -222,15 +209,15 @@ export const vibrate = (pattern: VibrationPattern): void => trigger(pattern);
  * Triggers a short, light tap.
  *
  * Best for subtle feedback: selection changes, toggles, or gentle confirmation.
- * On Vibration API: 15ms. On iOS: double tap for clearer feedback.
+ * On Vibration API: 15ms. On iPhone: one tick.
  */
 export const light = (): void => trigger(getPreset(HapticPreset.Light));
 
 /**
  * Triggers a medium-strength tap.
  *
- * Good for standard button presses and list item taps. Equivalent to a single
- * On Vibration API: 25ms. On iOS: three short pulses for clearer feedback.
+ * Good for standard button presses and list item taps.
+ * On Vibration API: 25ms. On iPhone: one tick.
  */
 export const medium = (): void => trigger(getPreset(HapticPreset.Medium));
 
@@ -238,14 +225,14 @@ export const medium = (): void => trigger(getPreset(HapticPreset.Medium));
  * Triggers a strong tap.
  *
  * Use for important actions (e.g. submit, delete) where you want a more
- * noticeable response. On Vibration API: 40ms. On iOS: four pulses.
+ * noticeable response. On Vibration API: 40ms. On iPhone: one tick.
  */
 export const heavy = (): void => trigger(getPreset(HapticPreset.Heavy));
 
 /**
  * Triggers a double-tap pattern (short, pause, short).
  *
- * Suggests “success” or “done”—e.g. after saving, completing a step, or
+ * Suggests “success” or “done”, e.g. after saving, completing a step, or
  * confirming a choice.
  */
 export const success = (): void => trigger(getPreset(HapticPreset.Success));
@@ -253,7 +240,7 @@ export const success = (): void => trigger(getPreset(HapticPreset.Success));
 /**
  * Triggers a double-tap pattern with stronger pulses.
  *
- * Suggests “warning” or “attention”—e.g. before a destructive action or when
+ * Suggests “warning” or “attention”, e.g. before a destructive action or when
  * something needs the user’s notice.
  */
 export const warning = (): void => trigger(getPreset(HapticPreset.Warning));
@@ -268,6 +255,7 @@ export const error = (): void => trigger(getPreset(HapticPreset.Error));
 
 const Haptic: Haptic = {
   hasVibration,
+  isReliable,
   isSupported,
   vibrate,
   light,

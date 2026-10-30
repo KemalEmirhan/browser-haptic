@@ -4,13 +4,14 @@
 [![npm downloads](https://img.shields.io/npm/dm/browser-haptic.svg)](https://www.npmjs.com/package/browser-haptic)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Lightweight haptic feedback for JavaScript. Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API) where available (e.g. Android). On **iOS Safari 17.4+** it uses a hidden `input[switch]` toggle so the native switch haptic fires. No runtime dependencies.
+Lightweight haptic feedback for JavaScript. Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API) where available (e.g. Android). On **iPhone with Safari 17.4+** it toggles a hidden `input[switch]` once so the native switch tick fires (best effort, see [iOS](#ios)). No runtime dependencies.
 
-**[Try the playground →](https://playground-neon-gamma.vercel.app)** — live demo, install commands, and code samples for React, Vue, Svelte, Angular, and TypeScript.
+**[Try the playground →](https://playground-neon-gamma.vercel.app)**: live demo, install commands, and code samples for React, Vue, Svelte, Angular, and TypeScript.
 
 - [Install](#install)
 - [Usage](#usage)
 - [API](#api)
+- [iOS](#ios)
 - [Playground](#playground)
 - [Contributing](#contributing)
 
@@ -76,7 +77,8 @@ You can also use named imports if you prefer: `import { light, success, isSuppor
 
 | Method | Description |
 |--------|-------------|
-| `Haptic.isSupported()` | `true` if feedback is available (Vibration API or DOM for iOS switch fallback) |
+| `Haptic.isSupported()` | `true` if feedback can run: Vibration API, or an iPhone with Safari 17.4+. `false` on desktop Safari, desktop Firefox and iPads |
+| `Haptic.isReliable()` | `true` only when the Vibration API exists. On iPhone the tick is best effort |
 | `Haptic.hasVibration()` | `true` only when the Vibration API is available (e.g. Android) |
 | `Haptic.vibrate(pattern)` | Trigger feedback: `number` (ms) or `number[]` (vibrate/pause sequence) |
 | `Haptic.light()` | Short tap |
@@ -88,7 +90,17 @@ You can also use named imports if you prefer: `import { light, success, isSuppor
 
 **Type:** `VibrationPattern` = `number | number[]` (for `vibrate()`).
 
-On iOS Safari 17.4+, `isSupported()` is `true` but `hasVibration()` is `false`; the library uses a hidden native switch toggle.
+On an iPhone with Safari 17.4+, `isSupported()` is `true` but `isReliable()` and `hasVibration()` are `false`.
+
+## iOS
+
+iOS has no Vibration API. On iPhone the library toggles a hidden native switch, and iOS plays its switch tick. Limits:
+
+- **Call it synchronously inside a tap handler.** Never after `await`, a timer or a fetch: iOS only plays the tick during a user gesture.
+- **One tick only.** Every preset and every `vibrate()` pattern becomes a single tick. No patterns, no intensity.
+- **It may be silent on iOS 26.5+.** Newer iOS versions ignore script-triggered switch toggles, even inside a tap. There is no way to detect this, so `isReliable()` is `false` on iPhone.
+- **iPads are not supported.** They have no Taptic Engine.
+- The hidden switch's `click` and `change` events stop at the switch, so normal `document` listeners (analytics autocapture, outside-click handlers) do not see them. Listeners registered in the capture phase on `document` or `window` still do.
 
 ## Playground
 

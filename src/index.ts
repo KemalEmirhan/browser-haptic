@@ -1,5 +1,6 @@
 export {
   hasVibration,
+  isReliable,
   isSupported,
   vibrate,
   light,

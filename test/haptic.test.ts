@@ -2,6 +2,7 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import {
   hasVibration,
+  isReliable,
   isSupported,
   vibrate,
   light,
@@ -133,6 +134,7 @@ const PRESET_FNS: [string, () => void][] = PRESET_CASES.map(([name, fn]) => [nam
 
 const HAPTIC_METHODS = [
   "hasVibration",
+  "isReliable",
   "isSupported",
   "vibrate",
   "light",
@@ -161,6 +163,19 @@ describe("haptic", () => {
     ])("returns %s when %s", (expected, _label, nav) => {
       setGlobals(nav, undefined);
       expect(hasVibration()).toBe(expected);
+    });
+  });
+
+  describe("isReliable", () => {
+    test("is true when the Vibration API exists", () => {
+      setGlobals({ vibrate: () => true }, undefined);
+      expect(isReliable()).toBe(true);
+    });
+
+    test("is false on iPhone, where the switch tick may be silent", () => {
+      withIPhone();
+      expect(isSupported()).toBe(true);
+      expect(isReliable()).toBe(false);
     });
   });
 
@@ -257,41 +272,50 @@ describe("haptic", () => {
   });
 
   describe("iOS switch fallback (no Vibration API, with DOM)", () => {
-    const flush = () => new Promise((r) => setTimeout(r, 50));
-
-    test("toggles a hidden switch on iPhone", async () => {
+    test.each(PRESET_FNS)("%s toggles the switch exactly once, synchronously", (_name, fn) => {
       const dom = withIPhone();
-      vibrate(10);
-      await flush();
+      const realSetTimeout = globalThis.setTimeout;
+      const setTimeoutSpy = mock(() => 0);
+      (globalThis as unknown as { setTimeout: unknown }).setTimeout = setTimeoutSpy;
+      try {
+        fn();
+      } finally {
+        globalThis.setTimeout = realSetTimeout;
+      }
       expect(dom.appended.length).toBe(1);
+      expect(dom.clicks.count).toBe(1);
+      expect(setTimeoutSpy).toHaveBeenCalledTimes(0);
+    });
+
+    test("vibrate(pattern) is one tick on iPhone", () => {
+      const dom = withIPhone();
+      vibrate([10, 50, 10, 50, 10]);
       expect(dom.clicks.count).toBe(1);
     });
 
     test.each<[string, string]>([
       ["desktop Safari", DESKTOP_SAFARI_UA],
       ["iPad", IPAD_UA],
-    ])("does nothing on %s", async (_label, ua) => {
+    ])("does nothing on %s", (_label, ua) => {
       const dom = withIPhone(ua);
       success();
-      await flush();
       expect(dom.appended.length).toBe(0);
       expect(dom.clicks.count).toBe(0);
     });
 
-    test("click and change events do not bubble to document", async () => {
+    test("click and change events do not bubble to document", () => {
       const dom = withIPhone();
       const onClick = mock(() => {});
       const onChange = mock(() => {});
       dom.doc.addEventListener("click", onClick);
       dom.doc.addEventListener("change", onChange);
       light();
-      await flush();
-      expect(dom.clicks.count).toBeGreaterThan(0);
+      expect(dom.clicks.count).toBe(1);
       expect(onClick).toHaveBeenCalledTimes(0);
       expect(onChange).toHaveBeenCalledTimes(0);
     });
 
-    test("does not throw when DOM ops throw", async () => {
+    test("does not throw when DOM ops throw", () => {
       withIPhone();
       _global().document = {
         body: {},
@@ -300,7 +324,6 @@ describe("haptic", () => {
         },
       } as unknown as DocumentLike;
       expect(() => vibrate(10)).not.toThrow();
-      await flush();
     });
   });
 
