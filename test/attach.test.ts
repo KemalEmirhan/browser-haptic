@@ -41,7 +41,9 @@ const button = (html = "<button>Tap</button>"): HTMLElement => {
   return doc.body.firstElementChild as unknown as HTMLElement;
 };
 
-const overlayOf = (el: HTMLElement) => el.querySelector("input[switch]") as HTMLInputElement | null;
+/** The tap target: a label covering the element, tied to a hidden switch. */
+const overlayOf = (el: HTMLElement) => el.querySelector("label") as HTMLLabelElement | null;
+const switchOf = (el: HTMLElement) => el.querySelector("input[switch]") as HTMLInputElement | null;
 
 beforeEach(() => {
   saved = {};
@@ -56,16 +58,25 @@ afterEach(() => {
 describe("attach on iPhone (overlay)", () => {
   beforeEach(useIPhone);
 
-  test("adds one hidden switch covering the element", () => {
+  test("covers the element with a label tied to a hidden switch", () => {
     const el = button();
     attach(el);
-    const sw = overlayOf(el)!;
-    expect(sw).not.toBeNull();
+    const cover = overlayOf(el)!;
+    const sw = switchOf(el)!;
+    expect(cover.getAttribute("aria-hidden")).toBe("true");
+    expect(cover.style.position).toBe("absolute");
+    expect(cover.style.opacity).toBe("0");
+    expect(sw.parentElement).toBe(cover as never);
     expect(sw.type).toBe("checkbox");
-    expect(sw.getAttribute("aria-hidden")).toBe("true");
     expect(sw.tabIndex).toBe(-1);
-    expect(sw.style.opacity).toBe("0");
-    expect(sw.style.position).toBe("absolute");
+  });
+
+  test("a tap on the cover really toggles the switch", () => {
+    const el = button();
+    attach(el);
+    expect(switchOf(el)!.checked).toBe(false);
+    overlayOf(el)!.click();
+    expect(switchOf(el)!.checked).toBe(true);
   });
 
   test("makes a static element relative and restores it on cleanup", () => {
@@ -131,20 +142,21 @@ describe("attach on iPhone (overlay)", () => {
     expect(doc.activeElement).not.toBe(el as never);
   });
 
-  test("does not forward clicks to a disabled button", () => {
+  test("does nothing on a disabled button: no click, no toggle", () => {
     const el = button("<button disabled>Tap</button>");
     const onDoc = mock(() => {});
     doc.addEventListener("click", onDoc);
     attach(el);
     overlayOf(el)!.click();
     expect(onDoc).toHaveBeenCalledTimes(0);
+    expect(switchOf(el)!.checked).toBe(false);
   });
 
   test("is idempotent: a second attach adds nothing and returns a no-op", () => {
     const el = button();
     const detach = attach(el);
     const second = attach(el);
-    expect(el.querySelectorAll("input[switch]").length).toBe(1);
+    expect(el.querySelectorAll("label").length).toBe(1);
     second();
     expect(overlayOf(el)).not.toBeNull();
     detach();
@@ -155,7 +167,7 @@ describe("attach on iPhone (overlay)", () => {
     const el = button();
     attach(el)();
     attach(el);
-    expect(el.querySelectorAll("input[switch]").length).toBe(1);
+    expect(el.querySelectorAll("label").length).toBe(1);
   });
 });
 

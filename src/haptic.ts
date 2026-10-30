@@ -277,10 +277,12 @@ const attachVibration = (el: HTMLElement, preset: HapticPresetName): (() => void
 };
 
 /**
- * iPhone: put an invisible native switch on top of the element. The user's finger toggles
- * it for real, so iOS plays the switch tick even where script-triggered toggles are silent
- * (iOS 26.5+). The tap is then forwarded to the element as a click, so the app's own
- * handlers, form submits and links still work.
+ * iPhone: cover the element with an invisible `<label>` tied to a hidden native switch. The
+ * user's finger taps the label, which toggles the switch for real, so iOS plays the switch tick
+ * even where script-triggered toggles are silent (iOS 26.5+). The cover is a label, not the
+ * switch itself, so swipes that start on it still scroll the page or a scrolling row.
+ * The tap is then forwarded to the element as a click, so the app's own handlers, form submits
+ * and links still work.
  *
  * Based on `attachIOSOverlay` from https://github.com/howdoiusekeyboard/haptics (MIT).
  */
@@ -291,27 +293,39 @@ const attachOverlay = (el: HTMLElement): (() => void) => {
     el.style.position = "relative";
   }
 
+  const cover = document.createElement("label");
+  cover.setAttribute("aria-hidden", "true");
+  cover.style.cssText =
+    "position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;cursor:inherit;";
+
   const sw = document.createElement("input");
   sw.type = "checkbox";
   sw.setAttribute("switch", "");
-  sw.setAttribute("aria-hidden", "true");
   sw.tabIndex = -1;
   sw.style.cssText =
-    "position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:inherit;";
+    "position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);opacity:0;";
+  cover.appendChild(sw);
 
-  const onClick = (event: Event): void => {
+  const onCoverClick = (event: Event): void => {
+    // The label's own activation re-dispatches a click on the switch; that one stops at the switch.
+    if (event.target !== cover) return;
     event.stopPropagation();
-    if (isDisabled(el)) return;
+    if (isDisabled(el)) {
+      event.preventDefault(); // no toggle, so no tick
+      return;
+    }
     el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   };
-  sw.addEventListener("click", onClick);
+  cover.addEventListener("click", onCoverClick);
+  sw.addEventListener("click", stopEvent);
   sw.addEventListener("change", stopEvent);
-  el.appendChild(sw);
+  el.appendChild(cover);
 
   return () => {
-    sw.removeEventListener("click", onClick);
+    cover.removeEventListener("click", onCoverClick);
+    sw.removeEventListener("click", stopEvent);
     sw.removeEventListener("change", stopEvent);
-    sw.remove();
+    cover.remove();
     el.style.position = previousPosition;
   };
 };
@@ -320,8 +334,9 @@ const attachOverlay = (el: HTMLElement): (() => void) => {
  * Adds haptic feedback to every tap on an element. **The recommended way to get haptics on iPhone.**
  *
  * - **Android / Vibration API:** vibrates with `preset` on each click.
- * - **iPhone, Safari 17.4+:** covers the element with an invisible native switch, so the
- *   user's own tap plays the iOS switch tick (one tick, `preset` is ignored). Works on iOS 26.5+,
+ * - **iPhone, Safari 17.4+:** covers the element with an invisible label tied to a hidden native
+ *   switch, so the user's own tap plays the iOS switch tick (one tick, `preset` is ignored).
+ *   Scrolling still works when a swipe starts on the element. Works on iOS 26.5+,
  *   where `light()` and the other functions are silent. Clicks are forwarded to the element.
  * - **Anywhere else, or during SSR:** does nothing.
  *

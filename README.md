@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/browser-haptic.svg)](https://www.npmjs.com/package/browser-haptic)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Lightweight haptic feedback for JavaScript. Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API) where available (e.g. Android). On **iPhone with Safari 17.4+**, `attach()` puts an invisible native switch over your button so the user's tap plays the iOS switch tick (see [iOS](#ios)). No runtime dependencies.
+Lightweight haptic feedback for JavaScript. Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API) where available (e.g. Android). On **iPhone with Safari 17.4+**, `attach()` covers your button with an invisible label tied to a native switch, so the user's tap plays the iOS switch tick (see [iOS](#ios)). No runtime dependencies.
 
 **[Try the playground →](https://playground-neon-gamma.vercel.app)**: live demo, install commands, and code samples for React, Vue, Svelte, Angular, and TypeScript.
 
@@ -104,7 +104,7 @@ On an iPhone with Safari 17.4+, `isSupported()` is `true` but `isReliable()` and
 
 iOS has no Vibration API. The only web haptic on iPhone is the tick a native switch (`<input type="checkbox" switch>`, Safari 17.4+) plays when it is toggled.
 
-**Use `attach()`.** It covers your element with an invisible switch, so the user's finger toggles it for real and iOS plays the tick. The tap is then forwarded to your element as a click, so `onClick` handlers, form submits and links keep working. Since iOS 26.5, this is the only approach that still buzzes.
+**Use `attach()`.** It covers your element with an invisible `<label>` tied to a hidden native switch, so the user's finger toggles the switch for real and iOS plays the tick. Because the cover is a label and not the switch itself, swipes that start on the element still scroll, including inside scrolling rows and lists. The tap is then forwarded to your element as a click, so `onClick` handlers, form submits and links keep working. Since iOS 26.5, this is the only approach that still buzzes.
 
 - One tick per tap. Presets, patterns and intensity have no effect on iPhone.
 - iPads are not supported. They have no Taptic Engine.
@@ -113,7 +113,7 @@ iOS has no Vibration API. The only web haptic on iPhone is the tick a native swi
 
 **`light()`, `success()` and the other functions** toggle a hidden switch from code. iOS 26.5+ ignores script-triggered toggles even inside a tap, so they are silent there (confirmed on iOS 27). On older iOS they must be called synchronously inside a tap handler, never after `await` or a timer. Their hidden switch's `click` and `change` events stop at the switch, so normal `document` listeners do not see them; capture-phase listeners on `document` or `window` still do.
 
-The overlay technique is based on [`attachIOSOverlay`](https://github.com/howdoiusekeyboard/haptics/blob/main/packages/core/src/engine.ts) from [howdoiusekeyboard/haptics](https://github.com/howdoiusekeyboard/haptics) (MIT).
+The overlay technique is adapted from [`attachIOSOverlay`](https://github.com/howdoiusekeyboard/haptics/blob/main/packages/core/src/engine.ts) from [howdoiusekeyboard/haptics](https://github.com/howdoiusekeyboard/haptics) (MIT).
 
 ## Playground
 
