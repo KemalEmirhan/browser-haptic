@@ -42,12 +42,12 @@ const withVibrationApi = (): VibrateMock => {
 };
 
 const PRESET_CASES: [string, () => void, number | number[]][] = [
-  ["light", light, 30],
-  ["medium", medium, 50],
-  ["heavy", heavy, 80],
-  ["success", success, [20, 50, 20]],
-  ["warning", warning, [40, 30, 40]],
-  ["error", error, [50, 30, 50, 30, 50]],
+  ["light", light, 15],
+  ["medium", medium, 25],
+  ["heavy", heavy, 40],
+  ["success", success, [15, 60, 25]],
+  ["warning", warning, [25, 80, 25]],
+  ["error", error, [40, 60, 40, 60, 40]],
 ];
 
 const PRESET_FNS: [string, () => void][] = PRESET_CASES.map(([name, fn]) => [name, fn]);
@@ -119,18 +119,30 @@ describe("haptic", () => {
       expect(vibrateMock).toHaveBeenCalledWith(expected);
     });
 
-    test("on Android uses longer minimal presets (400–500ms) so vibration is noticeable", () => {
+    test("on Android uses the same short presets as other browsers", () => {
       const vibrateMock = createVibrateMock();
       setGlobals(
         { vibrate: vibrateMock, userAgent: "Mozilla/5.0 (Linux; Android 14) ..." },
         undefined,
       );
       light();
-      expect(vibrateMock).toHaveBeenNthCalledWith(1, 400);
+      expect(vibrateMock).toHaveBeenNthCalledWith(1, 15);
       success();
-      expect(vibrateMock).toHaveBeenNthCalledWith(2, [400, 80, 400]);
-      heavy();
-      expect(vibrateMock).toHaveBeenNthCalledWith(3, 500);
+      expect(vibrateMock).toHaveBeenNthCalledWith(2, [15, 60, 25]);
+    });
+
+    test.each(PRESET_CASES.filter(([, , p]) => typeof p === "number"))(
+      "%s is a single tap of at most 50ms",
+      (_name, _fn, pattern) => {
+        expect(pattern as number).toBeLessThanOrEqual(50);
+      },
+    );
+
+    test.each(PRESET_CASES)("%s pattern lasts at most 300ms in total", (_name, trigger) => {
+      trigger();
+      const sent = (vibrateMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]![0];
+      const total = ([] as number[]).concat(sent as number | number[]).reduce((a, b) => a + b, 0);
+      expect(total).toBeLessThanOrEqual(300);
     });
   });
 
@@ -199,7 +211,7 @@ describe("haptic", () => {
     test("delegates to same implementation as named exports", () => {
       const vibrateMock = withVibrationApi();
       Haptic.light();
-      expect(vibrateMock).toHaveBeenCalledWith(30);
+      expect(vibrateMock).toHaveBeenCalledWith(15);
     });
   });
 });

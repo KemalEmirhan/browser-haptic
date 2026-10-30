@@ -58,28 +58,17 @@ export interface Haptic {
   error(): void;
 }
 
-/** Presets for Vibration API (non-Android). Short durations for crisp haptic feedback. */
-const VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
-  [HapticPreset.Light, 30],
-  [HapticPreset.Medium, 50],
-  [HapticPreset.Heavy, 80],
-  [HapticPreset.Success, [20, 50, 20]],
-  [HapticPreset.Warning, [40, 30, 40]],
-  [HapticPreset.Error, [50, 30, 50, 30, 50]],
-]);
-
 /**
- * Presets for Android. Uses longer pulses (400–500ms) so vibration is not ignored on builds
- * that drop very short patterns. Kept minimal: single pulse for light/medium/heavy, 2–3
- * pulses for success/warning/error with short gaps.
+ * Presets for the Vibration API. Short pulses so a "light" tap feels like a tap, not a buzz.
+ * Single taps stay at or under 50ms and no pattern lasts longer than 300ms.
  */
-const ANDROID_VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
-  [HapticPreset.Light, 400],
-  [HapticPreset.Medium, 400],
-  [HapticPreset.Heavy, 500],
-  [HapticPreset.Success, [400, 80, 400]],
-  [HapticPreset.Warning, [400, 60, 400]],
-  [HapticPreset.Error, [400, 50, 400, 50, 400]],
+const VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
+  [HapticPreset.Light, 15],
+  [HapticPreset.Medium, 25],
+  [HapticPreset.Heavy, 40],
+  [HapticPreset.Success, [15, 60, 25]],
+  [HapticPreset.Warning, [25, 80, 25]],
+  [HapticPreset.Error, [40, 60, 40, 60, 40]],
 ]);
 
 /** Presets for iOS switch fallback. Multiple toggles so light/medium/heavy are noticeable. */
@@ -92,13 +81,9 @@ const IOS_PRESETS = new Map<HapticPreset, number | number[]>([
   [HapticPreset.Error, [50, 30, 50, 30, 50]],
 ]);
 
-const isAndroid = (): boolean =>
-  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent ?? "");
-
 const getPreset = (variant: HapticPreset): VibrationPattern => {
   if (!hasVibrationAPI()) return IOS_PRESETS.get(variant)!;
-  const presets = isAndroid() ? ANDROID_VIBRATION_PRESETS : VIBRATION_PRESETS;
-  return presets.get(variant)!;
+  return VIBRATION_PRESETS.get(variant)!;
 };
 
 const hasVibrationAPI = (): boolean =>
@@ -219,7 +204,7 @@ export const vibrate = (pattern: VibrationPattern): void => trigger(pattern);
  * Triggers a short, light tap.
  *
  * Best for subtle feedback: selection changes, toggles, or gentle confirmation.
- * On Vibration API: ~30ms. On iOS: double tap for clearer feedback.
+ * On Vibration API: 15ms. On iOS: double tap for clearer feedback.
  */
 export const light = (): void => trigger(getPreset(HapticPreset.Light));
 
@@ -227,7 +212,7 @@ export const light = (): void => trigger(getPreset(HapticPreset.Light));
  * Triggers a medium-strength tap.
  *
  * Good for standard button presses and list item taps. Equivalent to a single
- * On Vibration API: ~50ms. On iOS: three short pulses for clearer feedback.
+ * On Vibration API: 25ms. On iOS: three short pulses for clearer feedback.
  */
 export const medium = (): void => trigger(getPreset(HapticPreset.Medium));
 
@@ -235,7 +220,7 @@ export const medium = (): void => trigger(getPreset(HapticPreset.Medium));
  * Triggers a strong tap.
  *
  * Use for important actions (e.g. submit, delete) where you want a more
- * noticeable response. On Vibration API: ~80ms. On iOS: four pulses.
+ * noticeable response. On Vibration API: 40ms. On iOS: four pulses.
  */
 export const heavy = (): void => trigger(getPreset(HapticPreset.Heavy));
 
