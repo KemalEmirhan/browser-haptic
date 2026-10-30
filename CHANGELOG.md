@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1
+
+### Fixed
+
+- **iOS:** `attach()` no longer blocks scrolling. A swipe that started on an attached element could not scroll the page or a scrolling row (tab bars, carousels), because iOS treats a touch on a native switch as a touch on that control. The element is now covered by an invisible `<label>` tied to a hidden switch: the tap still toggles the switch for real, so the tick still plays, and swipes scroll normally.
+- **iOS:** tapping an attached disabled element no longer plays a tick.
+
 ## 1.1.0
 
 ### Changed
