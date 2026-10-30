@@ -8,9 +8,9 @@
  *
  * - **Android & supported desktop:** Uses the [Vibration API](https://developer.mozilla.org/en-US/docs/Web/API/Vibration_API)
  *   (`navigator.vibrate`) to run vibration patterns you define.
- * - **iOS Safari 17.4+:** The Vibration API is not available. This module uses a hidden
- *   `input[switch]` element and programmatically toggles it; iOS plays its native switch haptic
- *   when that happens. No audio, no extra permissions.
+ * - **iPhone, Safari 17.4+:** The Vibration API is not available. This module toggles a hidden
+ *   `input[switch]` element once; iOS plays its native switch tick. Best effort only: it must run
+ *   synchronously inside a tap handler, it is always a single tick, and iOS 26.5+ may ignore it.
  *
  * If the environment doesn’t support either (e.g. old browsers or SSR), all functions no-op
  * and never throw.
@@ -38,6 +38,9 @@ export enum HapticPreset {
   Error = "error",
 }
 
+/** A preset as an enum value or its string name, e.g. `HapticPreset.Success` or `"success"`. */
+export type HapticPresetName = HapticPreset | `${HapticPreset}`;
+
 /**
  * Type of the default export: an object with all haptic methods.
  * Use this when you need to type a variable that holds the default import.
@@ -47,7 +50,9 @@ export enum HapticPreset {
  * const feedback: Haptic = Haptic;
  */
 export interface Haptic {
+  attach(el: HTMLElement, preset?: HapticPresetName): () => void;
   hasVibration(): boolean;
+  isReliable(): boolean;
   isSupported(): boolean;
   vibrate(pattern: VibrationPattern): void;
   light(): void;
@@ -58,54 +63,40 @@ export interface Haptic {
   error(): void;
 }
 
-/** Presets for Vibration API (non-Android). Short durations for crisp haptic feedback. */
-const VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
-  [HapticPreset.Light, 30],
-  [HapticPreset.Medium, 50],
-  [HapticPreset.Heavy, 80],
-  [HapticPreset.Success, [20, 50, 20]],
-  [HapticPreset.Warning, [40, 30, 40]],
-  [HapticPreset.Error, [50, 30, 50, 30, 50]],
-]);
-
 /**
- * Presets for Android. Uses longer pulses (400–500ms) so vibration is not ignored on builds
- * that drop very short patterns. Kept minimal: single pulse for light/medium/heavy, 2–3
- * pulses for success/warning/error with short gaps.
+ * Presets for the Vibration API. Short pulses so a "light" tap feels like a tap, not a buzz.
+ * Single taps stay at or under 50ms and no pattern lasts longer than 300ms.
  */
-const ANDROID_VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
-  [HapticPreset.Light, 400],
-  [HapticPreset.Medium, 400],
-  [HapticPreset.Heavy, 500],
-  [HapticPreset.Success, [400, 80, 400]],
-  [HapticPreset.Warning, [400, 60, 400]],
-  [HapticPreset.Error, [400, 50, 400, 50, 400]],
+const VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
+  [HapticPreset.Light, 15],
+  [HapticPreset.Medium, 25],
+  [HapticPreset.Heavy, 40],
+  [HapticPreset.Success, [15, 60, 25]],
+  [HapticPreset.Warning, [25, 80, 25]],
+  [HapticPreset.Error, [40, 60, 40, 60, 40]],
 ]);
 
-/** Presets for iOS switch fallback. Multiple toggles so light/medium/heavy are noticeable. */
-const IOS_PRESETS = new Map<HapticPreset, number | number[]>([
-  [HapticPreset.Light, [15, 40, 15]],
-  [HapticPreset.Medium, [15, 35, 15, 35, 15]],
-  [HapticPreset.Heavy, [15, 30, 15, 30, 15, 30, 15]],
-  [HapticPreset.Success, [20, 50, 20]],
-  [HapticPreset.Warning, [40, 30, 40]],
-  [HapticPreset.Error, [50, 30, 50, 30, 50]],
-]);
-
-const isAndroid = (): boolean =>
-  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent ?? "");
-
-const getPreset = (variant: HapticPreset): VibrationPattern => {
-  if (!hasVibrationAPI()) return IOS_PRESETS.get(variant)!;
-  const presets = isAndroid() ? ANDROID_VIBRATION_PRESETS : VIBRATION_PRESETS;
-  return presets.get(variant)!;
-};
+const getPreset = (variant: HapticPresetName): VibrationPattern =>
+  VIBRATION_PRESETS.get(variant as HapticPreset) ?? VIBRATION_PRESETS.get(HapticPreset.Light)!;
 
 const hasVibrationAPI = (): boolean =>
   typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
 
 const hasDOM = (): boolean =>
   typeof document !== "undefined" && !!document.body;
+
+/** iPhone or iPod. iPads are left out on purpose: they have no Taptic Engine. */
+const isIPhone = (): boolean =>
+  typeof navigator !== "undefined" && /iPhone|iPod/.test(navigator.userAgent ?? "");
+
+/** True when `<input type="checkbox" switch>` is supported (Safari 17.4+). */
+const hasSwitchControl = (): boolean =>
+  typeof HTMLInputElement !== "undefined" && "switch" in HTMLInputElement.prototype;
+
+/** The hidden-switch path only runs where it can buzz: an iPhone with switch support. */
+const canUseIOSSwitch = (): boolean => isIPhone() && hasSwitchControl() && hasDOM();
+
+const stopEvent = (event: Event): void => event.stopPropagation();
 
 const fireIOSSwitch = (): void => {
   if (!hasDOM()) return;
@@ -117,6 +108,8 @@ const fireIOSSwitch = (): void => {
     const input = document.createElement("input");
     input.type = "checkbox";
     input.setAttribute("switch", "");
+    label.addEventListener("click", stopEvent);
+    input.addEventListener("change", stopEvent);
     label.appendChild(input);
     document.body.appendChild(label);
     label.click();
@@ -142,16 +135,8 @@ const trigger = (pattern: VibrationPattern): void => {
     return;
   }
 
-  const arr = toPatternArray(pattern);
-  const pairs = Array.from(
-    { length: Math.ceil(arr.length / 2) },
-    (_, i) => [arr[i * 2] ?? 0, arr[i * 2 + 1] ?? 0] as const,
-  );
-  let delay = 0;
-  for (const [vibrateMs, pauseMs] of pairs) {
-    if (vibrateMs > 0) setTimeout(fireIOSSwitch, delay);
-    delay += vibrateMs + pauseMs;
-  }
+  // iOS: one tick, right now. A timer would leave the user gesture, and iOS drops the haptic.
+  if (canUseIOSSwitch()) fireIOSSwitch();
 };
 
 /**
@@ -159,7 +144,7 @@ const trigger = (pattern: VibrationPattern): void => {
  *
  * Returns `true` on Android and some desktop browsers that support
  * `navigator.vibrate`. Returns `false` on iOS Safari (which doesn’t implement
- * the Vibration API); on iOS you can still use the other functions—they will
+ * the Vibration API); on iOS you can still use the other functions: they will
  * use the switch-based fallback when this returns `false`.
  *
  * @returns `true` if `navigator.vibrate` is a function, otherwise `false`
@@ -174,10 +159,22 @@ const trigger = (pattern: VibrationPattern): void => {
 export const hasVibration = (): boolean => hasVibrationAPI();
 
 /**
+ * Checks whether feedback is **guaranteed** to run when called.
+ *
+ * Returns `true` only when the Vibration API exists. On iPhone the switch tick
+ * is best effort: iOS may ignore it (for example on iOS 26.5+, or when called
+ * outside a tap handler) and there is no way to detect that.
+ *
+ * @returns `true` if `navigator.vibrate` is a function, otherwise `false`
+ */
+export const isReliable = (): boolean => hasVibrationAPI();
+
+/**
  * Checks whether **any** haptic feedback can be triggered in this environment.
  *
- * Returns `true` if either the Vibration API is available or we’re in a browser
- * with a DOM (so the iOS switch fallback can run). Use this to decide whether
+ * Returns `true` if the Vibration API is available, or on an iPhone with
+ * Safari 17.4+ (where the hidden switch fallback runs). Returns `false` on
+ * desktop Safari, desktop Firefox and iPads, where nothing would happen. Use this to decide whether
  * to show “haptic” UI or to call the feedback functions at all. In SSR or
  * unsupported environments this returns `false` and all feedback calls no-op.
  *
@@ -192,7 +189,7 @@ export const hasVibration = (): boolean => hasVibrationAPI();
  */
 export const isSupported = (): boolean => {
   if (typeof navigator === "undefined" || typeof document === "undefined") return false;
-  return hasVibrationAPI() || hasDOM();
+  return hasVibrationAPI() || canUseIOSSwitch();
 };
 
 /**
@@ -200,12 +197,10 @@ export const isSupported = (): boolean => {
  *
  * Use this when the preset patterns (light, success, error, etc.) aren’t enough.
  * On Vibration API devices the pattern is passed through to `navigator.vibrate`.
- * On iOS the pattern is interpreted as a sequence of pulses: each “vibrate”
- * segment triggers one switch toggle, with pauses between them.
+ * On iPhone any pattern becomes a single switch tick.
  *
  * @param pattern - Either a single duration in ms, or an array of
- *   [vibrate, pause, vibrate, pause, ...] in ms. Pause values are used as delays
- *   between pulses; they don’t trigger vibration themselves.
+ *   [vibrate, pause, vibrate, pause, ...] in ms.
  * @returns Nothing. Never throws; unsupported environments no-op.
  *
  * @example
@@ -219,15 +214,15 @@ export const vibrate = (pattern: VibrationPattern): void => trigger(pattern);
  * Triggers a short, light tap.
  *
  * Best for subtle feedback: selection changes, toggles, or gentle confirmation.
- * On Vibration API: ~30ms. On iOS: double tap for clearer feedback.
+ * On Vibration API: 15ms. On iPhone: one tick.
  */
 export const light = (): void => trigger(getPreset(HapticPreset.Light));
 
 /**
  * Triggers a medium-strength tap.
  *
- * Good for standard button presses and list item taps. Equivalent to a single
- * On Vibration API: ~50ms. On iOS: three short pulses for clearer feedback.
+ * Good for standard button presses and list item taps.
+ * On Vibration API: 25ms. On iPhone: one tick.
  */
 export const medium = (): void => trigger(getPreset(HapticPreset.Medium));
 
@@ -235,14 +230,14 @@ export const medium = (): void => trigger(getPreset(HapticPreset.Medium));
  * Triggers a strong tap.
  *
  * Use for important actions (e.g. submit, delete) where you want a more
- * noticeable response. On Vibration API: ~80ms. On iOS: four pulses.
+ * noticeable response. On Vibration API: 40ms. On iPhone: one tick.
  */
 export const heavy = (): void => trigger(getPreset(HapticPreset.Heavy));
 
 /**
  * Triggers a double-tap pattern (short, pause, short).
  *
- * Suggests “success” or “done”—e.g. after saving, completing a step, or
+ * Suggests “success” or “done”, e.g. after saving, completing a step, or
  * confirming a choice.
  */
 export const success = (): void => trigger(getPreset(HapticPreset.Success));
@@ -250,7 +245,7 @@ export const success = (): void => trigger(getPreset(HapticPreset.Success));
 /**
  * Triggers a double-tap pattern with stronger pulses.
  *
- * Suggests “warning” or “attention”—e.g. before a destructive action or when
+ * Suggests “warning” or “attention”, e.g. before a destructive action or when
  * something needs the user’s notice.
  */
 export const warning = (): void => trigger(getPreset(HapticPreset.Warning));
@@ -263,8 +258,108 @@ export const warning = (): void => trigger(getPreset(HapticPreset.Warning));
  */
 export const error = (): void => trigger(getPreset(HapticPreset.Error));
 
+const attached = new WeakMap<HTMLElement, () => void>();
+const noop = (): void => {};
+
+const isDisabled = (el: HTMLElement): boolean => {
+  try {
+    return el.matches(":disabled");
+  } catch {
+    return false;
+  }
+};
+
+/** Android and other Vibration API browsers: vibrate on every click of the element. */
+const attachVibration = (el: HTMLElement, preset: HapticPresetName): (() => void) => {
+  const onClick = (): void => trigger(getPreset(preset));
+  el.addEventListener("click", onClick);
+  return () => el.removeEventListener("click", onClick);
+};
+
+/**
+ * iPhone: put an invisible native switch on top of the element. The user's finger toggles
+ * it for real, so iOS plays the switch tick even where script-triggered toggles are silent
+ * (iOS 26.5+). The tap is then forwarded to the element as a click, so the app's own
+ * handlers, form submits and links still work.
+ *
+ * Based on `attachIOSOverlay` from https://github.com/howdoiusekeyboard/haptics (MIT).
+ */
+const attachOverlay = (el: HTMLElement): (() => void) => {
+  const previousPosition = el.style.position;
+  const position = getComputedStyle(el).position;
+  if (!["relative", "absolute", "fixed", "sticky"].includes(position)) {
+    el.style.position = "relative";
+  }
+
+  const sw = document.createElement("input");
+  sw.type = "checkbox";
+  sw.setAttribute("switch", "");
+  sw.setAttribute("aria-hidden", "true");
+  sw.tabIndex = -1;
+  sw.style.cssText =
+    "position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:inherit;";
+
+  const onClick = (event: Event): void => {
+    event.stopPropagation();
+    if (isDisabled(el)) return;
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  };
+  sw.addEventListener("click", onClick);
+  sw.addEventListener("change", stopEvent);
+  el.appendChild(sw);
+
+  return () => {
+    sw.removeEventListener("click", onClick);
+    sw.removeEventListener("change", stopEvent);
+    sw.remove();
+    el.style.position = previousPosition;
+  };
+};
+
+/**
+ * Adds haptic feedback to every tap on an element. **The recommended way to get haptics on iPhone.**
+ *
+ * - **Android / Vibration API:** vibrates with `preset` on each click.
+ * - **iPhone, Safari 17.4+:** covers the element with an invisible native switch, so the
+ *   user's own tap plays the iOS switch tick (one tick, `preset` is ignored). Works on iOS 26.5+,
+ *   where `light()` and the other functions are silent. Clicks are forwarded to the element.
+ * - **Anywhere else, or during SSR:** does nothing.
+ *
+ * Calling it twice on the same element does nothing the second time.
+ *
+ * @param el - The element to add feedback to, usually a button or link.
+ * @param preset - Vibration preset for Vibration API devices. Defaults to `"light"`.
+ * @returns A cleanup function that removes the feedback.
+ *
+ * @example
+ * const detach = attach(document.querySelector("#save")!, "success");
+ * // later
+ * detach();
+ */
+export const attach = (el: HTMLElement, preset: HapticPresetName = HapticPreset.Light): (() => void) => {
+  if (!hasDOM() || attached.has(el)) return noop;
+
+  let detach: () => void;
+  try {
+    if (hasVibrationAPI()) detach = attachVibration(el, preset);
+    else if (canUseIOSSwitch()) detach = attachOverlay(el);
+    else return noop;
+  } catch {
+    return noop;
+  }
+
+  attached.set(el, detach);
+  return () => {
+    if (attached.get(el) !== detach) return;
+    attached.delete(el);
+    detach();
+  };
+};
+
 const Haptic: Haptic = {
+  attach,
   hasVibration,
+  isReliable,
   isSupported,
   vibrate,
   light,

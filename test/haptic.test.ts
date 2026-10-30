@@ -2,6 +2,7 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
 import {
   hasVibration,
+  isReliable,
   isSupported,
   vibrate,
   light,
@@ -41,19 +42,100 @@ const withVibrationApi = (): VibrateMock => {
   return vibrateMock;
 };
 
+
+const IPHONE_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+const IPAD_UA =
+  "Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+const DESKTOP_SAFARI_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
+
+type Listener = (event: { stopPropagation(): void }) => void;
+
+/**
+ * Minimal DOM stand-in. A label click runs the label's own listeners, then the
+ * input's change listeners, and bubbles each event to `document` unless a
+ * listener called stopPropagation.
+ */
+const createFakeDom = () => {
+  const documentListeners: Record<string, Listener[]> = {};
+  const appended: unknown[] = [];
+  const clicks = { count: 0 };
+
+  const createNode = (tag: string) => {
+    const listeners: Record<string, Listener[]> = {};
+    const children: ReturnType<typeof createNode>[] = [];
+    const dispatch = (type: string, own: Record<string, Listener[]>) => {
+      let stopped = false;
+      const event = { stopPropagation: () => { stopped = true; } };
+      for (const l of own[type] ?? []) l(event);
+      if (!stopped) for (const l of documentListeners[type] ?? []) l(event);
+    };
+    const node = {
+      tag,
+      type: "",
+      style: { cssText: "" },
+      setAttribute: () => {},
+      addEventListener: (type: string, l: Listener) => {
+        (listeners[type] ??= []).push(l);
+      },
+      appendChild: (child: ReturnType<typeof createNode>) => {
+        children.push(child);
+      },
+      click: () => {
+        clicks.count++;
+        dispatch("click", listeners);
+        for (const child of children) dispatch("change", child.listeners);
+      },
+      listeners,
+    };
+    return node;
+  };
+
+  const doc = {
+    body: {
+      appendChild: (n: unknown) => { appended.push(n); },
+      removeChild: () => {},
+    },
+    createElement: createNode,
+    addEventListener: (type: string, l: Listener) => {
+      (documentListeners[type] ??= []).push(l);
+    },
+  };
+  return { doc, appended, clicks };
+};
+
+class FakeSwitchInput {}
+(FakeSwitchInput.prototype as unknown as { switch: boolean }).switch = false;
+class FakePlainInput {}
+
+const setInputClass = (cls: unknown): void => {
+  (globalThis as unknown as { HTMLInputElement: unknown }).HTMLInputElement = cls;
+};
+
+/** iPhone Safari 17.4+: no Vibration API, switch input supported. */
+const withIPhone = (ua = IPHONE_UA, inputClass: unknown = FakeSwitchInput) => {
+  const dom = createFakeDom();
+  setGlobals({ vibrate: null, userAgent: ua }, dom.doc as unknown as DocumentLike);
+  setInputClass(inputClass);
+  return dom;
+};
+
 const PRESET_CASES: [string, () => void, number | number[]][] = [
-  ["light", light, 30],
-  ["medium", medium, 50],
-  ["heavy", heavy, 80],
-  ["success", success, [20, 50, 20]],
-  ["warning", warning, [40, 30, 40]],
-  ["error", error, [50, 30, 50, 30, 50]],
+  ["light", light, 15],
+  ["medium", medium, 25],
+  ["heavy", heavy, 40],
+  ["success", success, [15, 60, 25]],
+  ["warning", warning, [25, 80, 25]],
+  ["error", error, [40, 60, 40, 60, 40]],
 ];
 
 const PRESET_FNS: [string, () => void][] = PRESET_CASES.map(([name, fn]) => [name, fn]);
 
 const HAPTIC_METHODS = [
+  "attach",
   "hasVibration",
+  "isReliable",
   "isSupported",
   "vibrate",
   "light",
@@ -67,8 +149,12 @@ const HAPTIC_METHODS = [
 describe("haptic", () => {
   const originalNavigator = _global().navigator;
   const originalDocument = _global().document;
+  const originalInput = (globalThis as unknown as { HTMLInputElement: unknown }).HTMLInputElement;
 
-  afterEach(() => setGlobals(originalNavigator, originalDocument));
+  afterEach(() => {
+    setGlobals(originalNavigator, originalDocument);
+    setInputClass(originalInput);
+  });
 
   describe("hasVibration", () => {
     test.each<[boolean, string, NavigatorLike | undefined]>([
@@ -81,14 +167,36 @@ describe("haptic", () => {
     });
   });
 
+  describe("isReliable", () => {
+    test("is true when the Vibration API exists", () => {
+      setGlobals({ vibrate: () => true }, undefined);
+      expect(isReliable()).toBe(true);
+    });
+
+    test("is false on iPhone, where the switch tick may be silent", () => {
+      withIPhone();
+      expect(isSupported()).toBe(true);
+      expect(isReliable()).toBe(false);
+    });
+  });
+
   describe("isSupported", () => {
     test.each<[boolean, string, NavigatorLike | undefined, DocumentLike]>([
       [false, "navigator undefined", undefined, { body: {} }],
       [false, "document undefined", { vibrate: null }, undefined],
       [true, "navigator.vibrate exists", { vibrate: () => true }, { body: {} }],
-      [true, "document.body exists", { vibrate: null }, { body: {} }],
     ])("returns %s when %s", (expected, _label, nav, doc) => {
       setGlobals(nav, doc);
+      expect(isSupported()).toBe(expected);
+    });
+
+    test.each<[boolean, string, string, unknown]>([
+      [true, "iPhone with switch input", IPHONE_UA, FakeSwitchInput],
+      [false, "iPhone without switch input (iOS < 17.4)", IPHONE_UA, FakePlainInput],
+      [false, "iPad (no Taptic Engine)", IPAD_UA, FakeSwitchInput],
+      [false, "desktop Safari without vibrate", DESKTOP_SAFARI_UA, FakeSwitchInput],
+    ])("returns %s on %s", (expected, _label, ua, inputClass) => {
+      withIPhone(ua, inputClass);
       expect(isSupported()).toBe(expected);
     });
   });
@@ -119,18 +227,30 @@ describe("haptic", () => {
       expect(vibrateMock).toHaveBeenCalledWith(expected);
     });
 
-    test("on Android uses longer minimal presets (400–500ms) so vibration is noticeable", () => {
+    test("on Android uses the same short presets as other browsers", () => {
       const vibrateMock = createVibrateMock();
       setGlobals(
         { vibrate: vibrateMock, userAgent: "Mozilla/5.0 (Linux; Android 14) ..." },
         undefined,
       );
       light();
-      expect(vibrateMock).toHaveBeenNthCalledWith(1, 400);
+      expect(vibrateMock).toHaveBeenNthCalledWith(1, 15);
       success();
-      expect(vibrateMock).toHaveBeenNthCalledWith(2, [400, 80, 400]);
-      heavy();
-      expect(vibrateMock).toHaveBeenNthCalledWith(3, 500);
+      expect(vibrateMock).toHaveBeenNthCalledWith(2, [15, 60, 25]);
+    });
+
+    test.each(PRESET_CASES.filter(([, , p]) => typeof p === "number"))(
+      "%s is a single tap of at most 50ms",
+      (_name, _fn, pattern) => {
+        expect(pattern as number).toBeLessThanOrEqual(50);
+      },
+    );
+
+    test.each(PRESET_CASES)("%s pattern lasts at most 300ms in total", (_name, trigger) => {
+      trigger();
+      const sent = (vibrateMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]![0];
+      const total = ([] as number[]).concat(sent as number | number[]).reduce((a, b) => a + b, 0);
+      expect(total).toBeLessThanOrEqual(300);
     });
   });
 
@@ -153,41 +273,58 @@ describe("haptic", () => {
   });
 
   describe("iOS switch fallback (no Vibration API, with DOM)", () => {
-    test("trigger calls fireIOSSwitch via setTimeout when document.body exists", async () => {
-      const appendChild = mock(() => {});
-      const removeChild = mock(() => {});
-      const click = mock(() => {});
-      const mockInput = { type: "", setAttribute: () => {} };
-      const mockLabel = {
-        setAttribute: () => {},
-        style: { cssText: "" },
-        appendChild: () => {},
-        click: click as () => void,
-        removeChild: () => {},
-      };
-      const createElement = mock((...args: unknown[]) => (args[0] === "label" ? mockLabel : mockInput));
-      const body = { appendChild: appendChild as (node: unknown) => void, removeChild: removeChild as (node: unknown) => void };
-      const doc = { body, createElement };
-      setGlobals({ vibrate: null }, doc as unknown as DocumentLike);
-      vibrate(10);
-      await new Promise((r) => setTimeout(r, 50));
-      expect(createElement).toHaveBeenCalledWith("label");
-      expect(createElement).toHaveBeenCalledWith("input");
-      expect(appendChild).toHaveBeenCalledWith(mockLabel);
-      expect(removeChild).toHaveBeenCalledWith(mockLabel);
-      expect(click).toHaveBeenCalledWith();
+    test.each(PRESET_FNS)("%s toggles the switch exactly once, synchronously", (_name, fn) => {
+      const dom = withIPhone();
+      const realSetTimeout = globalThis.setTimeout;
+      const setTimeoutSpy = mock(() => 0);
+      (globalThis as unknown as { setTimeout: unknown }).setTimeout = setTimeoutSpy;
+      try {
+        fn();
+      } finally {
+        globalThis.setTimeout = realSetTimeout;
+      }
+      expect(dom.appended.length).toBe(1);
+      expect(dom.clicks.count).toBe(1);
+      expect(setTimeoutSpy).toHaveBeenCalledTimes(0);
     });
 
-    test("fireIOSSwitch catch block does not throw when DOM ops throw", async () => {
-      const doc = {
+    test("vibrate(pattern) is one tick on iPhone", () => {
+      const dom = withIPhone();
+      vibrate([10, 50, 10, 50, 10]);
+      expect(dom.clicks.count).toBe(1);
+    });
+
+    test.each<[string, string]>([
+      ["desktop Safari", DESKTOP_SAFARI_UA],
+      ["iPad", IPAD_UA],
+    ])("does nothing on %s", (_label, ua) => {
+      const dom = withIPhone(ua);
+      success();
+      expect(dom.appended.length).toBe(0);
+      expect(dom.clicks.count).toBe(0);
+    });
+
+    test("click and change events do not bubble to document", () => {
+      const dom = withIPhone();
+      const onClick = mock(() => {});
+      const onChange = mock(() => {});
+      dom.doc.addEventListener("click", onClick);
+      dom.doc.addEventListener("change", onChange);
+      light();
+      expect(dom.clicks.count).toBe(1);
+      expect(onClick).toHaveBeenCalledTimes(0);
+      expect(onChange).toHaveBeenCalledTimes(0);
+    });
+
+    test("does not throw when DOM ops throw", () => {
+      withIPhone();
+      _global().document = {
         body: {},
         createElement: () => {
           throw new Error("createElement blocked");
         },
-      };
-      setGlobals({ vibrate: null }, doc as unknown as DocumentLike);
-      vibrate(10);
-      await new Promise((r) => setTimeout(r, 50));
+      } as unknown as DocumentLike;
+      expect(() => vibrate(10)).not.toThrow();
     });
   });
 
@@ -199,7 +336,7 @@ describe("haptic", () => {
     test("delegates to same implementation as named exports", () => {
       const vibrateMock = withVibrationApi();
       Haptic.light();
-      expect(vibrateMock).toHaveBeenCalledWith(30);
+      expect(vibrateMock).toHaveBeenCalledWith(15);
     });
   });
 });

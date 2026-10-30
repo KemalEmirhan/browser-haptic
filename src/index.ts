@@ -1,5 +1,7 @@
 export {
+  attach,
   hasVibration,
+  isReliable,
   isSupported,
   vibrate,
   light,
@@ -8,6 +10,8 @@ export {
   success,
   warning,
   error,
+  HapticPreset,
+  type HapticPresetName,
   type VibrationPattern,
   type Haptic,
 } from "./haptic.js";
