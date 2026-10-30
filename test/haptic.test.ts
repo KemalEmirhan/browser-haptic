@@ -133,6 +133,7 @@ const PRESET_CASES: [string, () => void, number | number[]][] = [
 const PRESET_FNS: [string, () => void][] = PRESET_CASES.map(([name, fn]) => [name, fn]);
 
 const HAPTIC_METHODS = [
+  "attach",
   "hasVibration",
   "isReliable",
   "isSupported",

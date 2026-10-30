@@ -38,6 +38,9 @@ export enum HapticPreset {
   Error = "error",
 }
 
+/** A preset as an enum value or its string name, e.g. `HapticPreset.Success` or `"success"`. */
+export type HapticPresetName = HapticPreset | `${HapticPreset}`;
+
 /**
  * Type of the default export: an object with all haptic methods.
  * Use this when you need to type a variable that holds the default import.
@@ -47,6 +50,7 @@ export enum HapticPreset {
  * const feedback: Haptic = Haptic;
  */
 export interface Haptic {
+  attach(el: HTMLElement, preset?: HapticPresetName): () => void;
   hasVibration(): boolean;
   isReliable(): boolean;
   isSupported(): boolean;
@@ -72,7 +76,8 @@ const VIBRATION_PRESETS = new Map<HapticPreset, number | number[]>([
   [HapticPreset.Error, [40, 60, 40, 60, 40]],
 ]);
 
-const getPreset = (variant: HapticPreset): VibrationPattern => VIBRATION_PRESETS.get(variant)!;
+const getPreset = (variant: HapticPresetName): VibrationPattern =>
+  VIBRATION_PRESETS.get(variant as HapticPreset) ?? VIBRATION_PRESETS.get(HapticPreset.Light)!;
 
 const hasVibrationAPI = (): boolean =>
   typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
@@ -253,7 +258,107 @@ export const warning = (): void => trigger(getPreset(HapticPreset.Warning));
  */
 export const error = (): void => trigger(getPreset(HapticPreset.Error));
 
+const attached = new WeakMap<HTMLElement, () => void>();
+const noop = (): void => {};
+
+const isDisabled = (el: HTMLElement): boolean => {
+  try {
+    return el.matches(":disabled");
+  } catch {
+    return false;
+  }
+};
+
+/** Android and other Vibration API browsers: vibrate on every click of the element. */
+const attachVibration = (el: HTMLElement, preset: HapticPresetName): (() => void) => {
+  const onClick = (): void => trigger(getPreset(preset));
+  el.addEventListener("click", onClick);
+  return () => el.removeEventListener("click", onClick);
+};
+
+/**
+ * iPhone: put an invisible native switch on top of the element. The user's finger toggles
+ * it for real, so iOS plays the switch tick even where script-triggered toggles are silent
+ * (iOS 26.5+). The tap is then forwarded to the element as a click, so the app's own
+ * handlers, form submits and links still work.
+ *
+ * Based on `attachIOSOverlay` from https://github.com/howdoiusekeyboard/haptics (MIT).
+ */
+const attachOverlay = (el: HTMLElement): (() => void) => {
+  const previousPosition = el.style.position;
+  const position = getComputedStyle(el).position;
+  if (!["relative", "absolute", "fixed", "sticky"].includes(position)) {
+    el.style.position = "relative";
+  }
+
+  const sw = document.createElement("input");
+  sw.type = "checkbox";
+  sw.setAttribute("switch", "");
+  sw.setAttribute("aria-hidden", "true");
+  sw.tabIndex = -1;
+  sw.style.cssText =
+    "position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:inherit;";
+
+  const onClick = (event: Event): void => {
+    event.stopPropagation();
+    if (isDisabled(el)) return;
+    el.focus({ preventScroll: true });
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+  };
+  sw.addEventListener("click", onClick);
+  sw.addEventListener("change", stopEvent);
+  el.appendChild(sw);
+
+  return () => {
+    sw.removeEventListener("click", onClick);
+    sw.removeEventListener("change", stopEvent);
+    sw.remove();
+    el.style.position = previousPosition;
+  };
+};
+
+/**
+ * Adds haptic feedback to every tap on an element. **The recommended way to get haptics on iPhone.**
+ *
+ * - **Android / Vibration API:** vibrates with `preset` on each click.
+ * - **iPhone, Safari 17.4+:** covers the element with an invisible native switch, so the
+ *   user's own tap plays the iOS switch tick (one tick, `preset` is ignored). Works on iOS 26.5+,
+ *   where `light()` and the other functions are silent. Clicks are forwarded to the element.
+ * - **Anywhere else, or during SSR:** does nothing.
+ *
+ * Calling it twice on the same element does nothing the second time.
+ *
+ * @param el - The element to add feedback to, usually a button or link.
+ * @param preset - Vibration preset for Vibration API devices. Defaults to `"light"`.
+ * @returns A cleanup function that removes the feedback.
+ *
+ * @example
+ * const detach = attach(document.querySelector("#save")!, "success");
+ * // later
+ * detach();
+ */
+export const attach = (el: HTMLElement, preset: HapticPresetName = HapticPreset.Light): (() => void) => {
+  if (!hasDOM() || attached.has(el)) return noop;
+
+  let detach: () => void;
+  try {
+    if (hasVibrationAPI()) detach = attachVibration(el, preset);
+    else if (canUseIOSSwitch()) detach = attachOverlay(el);
+    else return noop;
+  } catch {
+    return noop;
+  }
+
+  attached.set(el, detach);
+  return () => {
+    if (attached.get(el) !== detach) return;
+    attached.delete(el);
+    detach();
+  };
+};
+
 const Haptic: Haptic = {
+  attach,
   hasVibration,
   isReliable,
   isSupported,

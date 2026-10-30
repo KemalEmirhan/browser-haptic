@@ -11,7 +11,9 @@
 
 ### Added
 
-- `isReliable()`: `true` only when the Vibration API exists. On iPhone the tick is best effort and may be silent on iOS 26.5+.
+- `attach(el, preset?)`: haptic feedback on every tap of an element, returns a cleanup function. On iPhone it covers the element with an invisible native switch so the user's own tap plays the tick, the only approach that still buzzes on iOS 26.5+. Clicks are forwarded to the element. On Android it vibrates with the preset. Based on `attachIOSOverlay` from howdoiusekeyboard/haptics (MIT).
+- `HapticPresetName` type: a preset enum value or its string name.
+- `isReliable()`: `true` only when the Vibration API exists. On iPhone, `light()` and the other functions are silent on iOS 26.5+; use `attach()`.
 - `HapticPreset` is now exported from the package entry.
 - README section on iOS limits.
 
