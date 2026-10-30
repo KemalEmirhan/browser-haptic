@@ -26,7 +26,7 @@
     "version:minor": "./scripts/bump.sh minor",
     "version:major": "./scripts/bump.sh major"
   },
-  "packageManager": "bun",
+  "packageManager": "bun@1.4.4",
   "keywords": [
     "browser-haptic",
     "haptic",
@@ -58,9 +58,6 @@
   "homepage": "https://playground-neon-gamma.vercel.app",
   "bugs": {
     "url": "https://github.com/KemalEmirhan/browser-haptic/issues"
-  },
-  "engines": {
-    "node": ">=18"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

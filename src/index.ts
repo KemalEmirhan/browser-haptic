@@ -9,6 +9,7 @@ export {
   success,
   warning,
   error,
+  HapticPreset,
   type VibrationPattern,
   type Haptic,
 } from "./haptic.js";

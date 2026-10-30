@@ -43,7 +43,7 @@ jobs:
           node-version: 24
 
       - name: Install
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Test
         run: bun test
