@@ -302,7 +302,6 @@ const attachOverlay = (el: HTMLElement): (() => void) => {
   const onClick = (event: Event): void => {
     event.stopPropagation();
     if (isDisabled(el)) return;
-    el.focus({ preventScroll: true });
     el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
   };
   sw.addEventListener("click", onClick);

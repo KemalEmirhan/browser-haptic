@@ -124,11 +124,11 @@ describe("attach on iPhone (overlay)", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  test("focuses the element on tap", () => {
+  test("does not move focus on tap, like a native iOS tap", () => {
     const el = button();
     attach(el);
     overlayOf(el)!.click();
-    expect(doc.activeElement).toBe(el as never);
+    expect(doc.activeElement).not.toBe(el as never);
   });
 
   test("does not forward clicks to a disabled button", () => {
